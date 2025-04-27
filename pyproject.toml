@@ -1,0 +1,79 @@
+[build-system]
+requires = [
+  # NOTE: this needs to be kept in sync with build-requirements.txt and requirements.txt
+  # build-requirements.txt
+  "hatchling",
+  # requirements.txt
+  "numpy",
+  "mujoco==3.3.1"
+]
+build-backend = "hatchling.build"
+
+[project]
+name = "rcsssmj"
+description = "MuJoCo based RoboCup Soccer Simulation Server"
+keywords = ["RoboCup", "Soccer", "Simulation", "AI"]
+readme = "README.md"
+authors = [
+    {name = "Nico Bohlinger", email = "nico.bohlinger@gmail.com"},
+    {name = "Stefan Glaser", email = "glaser.stefan@gmx.net"}
+]
+classifiers = [
+  # How mature is this project? Common values are
+  #   3 - Alpha
+  #   4 - Beta
+  #   5 - Production/Stable
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Topic :: Software Development",
+  "Typing :: Typed",
+]
+requires-python = ">= 3.10"
+dependencies = [
+  # When changing this, also update build-system.requires and requirements.txt
+  "numpy",
+  "mujoco==3.3.1"
+]
+dynamic = ["version"]
+
+[project.scripts]
+mjrcssserver = "rcsssmj.__main__:soccer_sim"
+
+[tool.ruff]
+line-length = 240
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0"
+]
+
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/rcsssmj tests}"
+
+[tool.hatch.envs.test]
+extra-dependencies = [
+  "pytest"
+]
+
+[tool.hatch.version]
+path = "src/rcsssmj/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rcsssmj"]

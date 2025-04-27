@@ -1,1 +1,14 @@
+# Pyhon byte-compiled / optimized files
 __pycache__/
+*.py[cod]
+*$py.class
+
+# build artifacts
+dist/
+
+# build caches
+.mypy_cache
+.ruff_cache
+
+# mujoco log
+MUJOCO_LOG.TXT

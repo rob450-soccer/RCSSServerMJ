@@ -9,6 +9,7 @@
   </default>
   <worldbody>
     <body name="torso" pos="0 0 0">
+      <site name="torso_site" pos="0 0 0"/>
       <camera name="track" mode="trackcom" pos="0 -3 0.3" xyaxes="1 0 0 0 0 1"/>
       <geom name="torso_geom" pos="0 0 0" size="0.25" type="sphere"/>
       <joint armature="0" damping="0" limited="false" margin="0.01" name="root" pos="0 0 0" type="free"/>
@@ -59,13 +60,25 @@
     </body>
   </worldbody>
   <actuator>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="hip_4" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ankle_4" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="hip_1" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ankle_1" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="hip_2" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ankle_2" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="hip_3" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ankle_3" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l4e1" joint="hip_4" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l4e2" joint="ankle_4" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l1e1" joint="hip_1" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l1e2" joint="ankle_1" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l2e1" joint="hip_2" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l2e2" joint="ankle_2" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l3e1" joint="hip_3" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l3e2" joint="ankle_3" gear="150"/>
   </actuator>
+  <sensor>
+    <gyro name="torso_gyro" site="torso_site"/>
+    <accelerometer name="torso_acc" site="torso_site"/>
+    <jointpos name="l4j1" joint="hip_4"/>
+    <jointpos name="l4j2" joint="ankle_4"/>
+    <jointpos name="l1j1" joint="hip_1"/>
+    <jointpos name="l1j2" joint="ankle_1"/>
+    <jointpos name="l2j1" joint="hip_2"/>
+    <jointpos name="l2j2" joint="ankle_2"/>
+    <jointpos name="l3j1" joint="hip_3"/>
+    <jointpos name="l3j2" joint="ankle_3"/>
+  </sensor>
 </mujoco>
