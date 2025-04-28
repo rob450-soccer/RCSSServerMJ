@@ -43,7 +43,7 @@ class MujocoMonitor(SimMonitor):
         primary_monitor = glfw.get_primary_monitor()
         video_mode = glfw.get_video_mode(primary_monitor)
         window_width, window_height = video_mode.size
-        self.window = glfw.create_window(width=window_width, height=window_height, title="MuJoCo", monitor=None, share=None)
+        self.window = glfw.create_window(width=window_width, height=window_height, title='MuJoCo', monitor=None, share=None)
         glfw.make_context_current(self.window)
 
         glfw.set_mouse_button_callback(self.window, self.mouse_button)
@@ -56,7 +56,7 @@ class MujocoMonitor(SimMonitor):
 
         self.camera = mujoco.MjvCamera()
         mujoco.mjv_defaultFreeCamera(model, self.camera)
-        self.all_camera_modes = ("static", "follow")
+        self.all_camera_modes = ('static', 'follow')
         self.camera_mode_iter = cycle(self.all_camera_modes)
         self.camera_mode = next(self.camera_mode_iter)
         self.camera_mode_target = self.camera_mode
@@ -146,7 +146,7 @@ class MujocoMonitor(SimMonitor):
         if act != glfw.RELEASE:
             return
 
-        elif key == glfw.KEY_H:
+        if key == glfw.KEY_H:
             self.hide_menu = not self.hide_menu
         elif key == glfw.KEY_TAB:
             self.camera_mode_target = next(self.camera_mode_iter)
@@ -216,20 +216,20 @@ class MujocoMonitor(SimMonitor):
         topleft = mujoco.mjtGridPos.mjGRID_TOPLEFT
         bottomright = mujoco.mjtGridPos.mjGRID_BOTTOMRIGHT
 
-        overlays[bottomright] = ["Framerate:", str(int(self.fps))]
-        overlays[topleft] = ["", ""]
+        overlays[bottomright] = ['Framerate:', str(int(self.fps))]
+        overlays[topleft] = ['', '']
         overlays[topleft][0] += 'Press K for "Kick-Off Left".\n'
-        overlays[topleft][1] += "\n"
+        overlays[topleft][1] += '\n'
         overlays[topleft][0] += 'Press J for "Kick-Off Right".\n'
-        overlays[topleft][1] += "\n"
+        overlays[topleft][1] += '\n'
         overlays[topleft][0] += 'Press B for "Drop-Ball".\n'
-        overlays[topleft][1] += "\n"
-        overlays[topleft][0] += "Press H to hide the menu.\n"
-        overlays[topleft][1] += "\n"
-        overlays[topleft][0] += "Press TAB to switch cameras.\n"
-        overlays[topleft][1] += "\n"
-        overlays[topleft][0] += "Camera mode:\n"
-        overlays[topleft][1] += self.camera_mode + "\n"
+        overlays[topleft][1] += '\n'
+        overlays[topleft][0] += 'Press H to hide the menu.\n'
+        overlays[topleft][1] += '\n'
+        overlays[topleft][0] += 'Press TAB to switch cameras.\n'
+        overlays[topleft][1] += '\n'
+        overlays[topleft][0] += 'Camera mode:\n'
+        overlays[topleft][1] += self.camera_mode + '\n'
 
         return overlays
 
@@ -238,7 +238,7 @@ class MujocoMonitor(SimMonitor):
         Set the active camera mode.
         """
 
-        if self.camera_mode_target == "static" and self.camera_mode != "static":
+        if self.camera_mode_target == 'static' and self.camera_mode != 'static':
             self.camera.fixedcamid = 0
             self.camera.type = mujoco.mjtCamera.mjCAMERA_FREE
             self.camera.trackbodyid = -1
@@ -246,7 +246,7 @@ class MujocoMonitor(SimMonitor):
             self.camera.elevation = -45.0
             self.camera.azimuth = 90.0
 
-        if self.camera_mode_target == "follow" and self.camera_mode != "follow":
+        if self.camera_mode_target == 'follow' and self.camera_mode != 'follow':
             self.camera.fixedcamid = -1
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = 0

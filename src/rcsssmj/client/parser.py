@@ -68,14 +68,15 @@ class SExprActionParser(ActionParser):
                     if len(chunks) == 4:
                         actions.append(BeamAction(model_prefix + 'beam', (float(chunks[1]), float(chunks[2]), float(chunks[3]))))
 
-                if chunks[0] == b'say':
+                elif chunks[0] == b'say':
                     # say action: (say <message>)
                     if len(chunks) > 1:
                         actions.append(SayAction(model_prefix + 'say', ' '.join([chunk.decode() for chunk in chunks[1:]])))
 
-                if chunks[0] == b'syn':
+                elif chunks[0] == b'syn':
                     # sync action: (syn)
                     pass
+
                 elif len(chunks) == 2:
                     # joint action: (<name> <velocity>)
                     actions.append(MotorAction(model_prefix + chunks[0].decode(), float(chunks[1])))
@@ -101,17 +102,17 @@ class SExprActionParser(ActionParser):
         while idx < len(data):
             if data[idx] == ord(' '):
                 if idx > start_idx:
-                    chunks.append(data[start_idx : idx])
+                    chunks.append(data[start_idx:idx])
                 start_idx = idx + 1
             if data[idx] == ord(')'):
                 if idx > start_idx:
-                    chunks.append(data[start_idx : idx])
+                    chunks.append(data[start_idx:idx])
                 return chunks, idx + 1
             if data[idx] == ord('('):
                 raise RuntimeError
             idx += 1
 
         if idx > start_idx:
-            chunks.append(data[start_idx : idx])
+            chunks.append(data[start_idx:idx])
 
         return chunks, idx

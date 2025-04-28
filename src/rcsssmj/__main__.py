@@ -13,9 +13,11 @@ def soccer_sim() -> None:
     # parse arguments
     parser = argparse.ArgumentParser(description='The RocoCup MuJoCo Soccer Simulation Server.')
 
+    # fmt: off
     parser.add_argument('-s', '--host',         type=str, help='The server address.', default='127.0.0.1', required=False)
     parser.add_argument('-p', '--port',         type=int, help='The client port.',    default=60000,       required=False)
     parser.add_argument('-m', '--monitor_port', type=int, help='The monitor port.',   default=60001,       required=False)
+    # fmt: on
 
     args = parser.parse_args()
 

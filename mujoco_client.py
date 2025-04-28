@@ -50,7 +50,7 @@ class Client:
         # set TCP_NODELAY option to send messages immediately (without buffering)
         self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-        print("[CONNECTED] Connected to the server.")
+        print('[CONNECTED] Connected to the server.')
 
     def run(self):
         """
@@ -85,7 +85,7 @@ class Client:
         init_msg = f'(init {self._model_name} {self._team} {self._player_no})'
         self._send_message(init_msg.encode())
 
-        print("[TEAM] Sent init message.")
+        print('[TEAM] Sent init message.')
 
         while True:
             try:
@@ -107,7 +107,7 @@ class Client:
                 # send action message
                 self._send_message(action_msg.encode())
             except Exception:
-                print("Connection closed.")
+                print('Connection closed.')
                 break
 
     def _send_message(self, msg: bytes | bytearray) -> None:
@@ -140,14 +140,16 @@ class Client:
         return self._rcv_buffer[:msg_size]
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser(description='The RocoCup MuJoCo Soccer Simulation Example Client.')
 
+    # fmt: off
     parser.add_argument('-s', '--host',      type=str, help='The server address.', default='127.0.0.1', required=False)
     parser.add_argument('-p', '--port',      type=int, help='The server port.',    default=60000,       required=False)
     parser.add_argument('-t', '--team',      type=str, help='The team name.',      default='Test',      required=False)
     parser.add_argument('-n', '--player_no', type=int, help='The player number.',  default=1,           required=False)
+    # fmt: on
 
     args = parser.parse_args()
 

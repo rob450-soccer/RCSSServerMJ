@@ -4,10 +4,10 @@ import numpy as np
 
 
 def place_robot_2d(
-        model_prefix: str,
-        mj_data: Any,
-        pose: tuple[float, float, float],
-    ) -> None:
+    model_prefix: str,
+    mj_data: Any,
+    pose: tuple[float, float, float],
+) -> None:
     """
     Place the robot identified by the given model prefix at the specified 2D location.
     """
@@ -26,11 +26,11 @@ def place_robot_2d(
 
 
 def place_robot_3d(
-        model_prefix: str,
-        mj_data: Any,
-        pos: tuple[float, float, float],
-        quat: tuple[float, float, float, float],
-    ) -> None:
+    model_prefix: str,
+    mj_data: Any,
+    pos: tuple[float, float, float],
+    quat: tuple[float, float, float, float],
+) -> None:
     """
     Place the robot identified by the given model prefix at the specified 3D location.
     """

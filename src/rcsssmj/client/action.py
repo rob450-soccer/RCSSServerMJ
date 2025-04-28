@@ -10,11 +10,11 @@ class InitRequest:
     """
 
     def __init__(
-            self,
-            model_name: str,
-            team_name: str,
-            player_no: int
-        ) -> None:
+        self,
+        model_name: str,
+        team_name: str,
+        player_no: int,
+    ) -> None:
         self.model_name: Final[str] = model_name
         self.team_name: Final[str] = team_name
         self.player_no: Final[int] = player_no

@@ -142,18 +142,19 @@ class TouchPerception(Perception):
 
         return f'(TCH name {self.name} val {self.active})'
 
+
 class GameStatePerception(Perception):
     """
     A game state perception.
     """
 
     def __init__(
-            self,
-            score_left: int,
-            score_right: int,
-            play_time: float,
-            play_mode: str,
-        ) -> None:
+        self,
+        score_left: int,
+        score_right: int,
+        play_time: float,
+        play_mode: str,
+    ) -> None:
         """
         Construct a new game state perception.
         """

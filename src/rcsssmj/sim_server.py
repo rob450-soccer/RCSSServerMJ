@@ -1,8 +1,8 @@
 import socket
+import time
 from math import degrees
 from queue import Empty
 from threading import Thread
-import time
 from typing import TYPE_CHECKING, Any, Final, cast
 
 import mujoco
@@ -23,13 +23,13 @@ if TYPE_CHECKING:
 
 class Server:
     def __init__(
-            self,
-            host: str,
-            client_port: int = 60000,
-            monitor_port: int = 60001,
-            *,
-            render: bool = True
-        ) -> None:
+        self,
+        host: str,
+        client_port: int = 60000,
+        monitor_port: int = 60001,
+        *,
+        render: bool = True,
+    ) -> None:
         """
         Construct a new simulation sever.
         """
@@ -61,7 +61,7 @@ class Server:
             raise RuntimeError
 
         # 1. SETUP: Setup sockets and start server threads
-        print("[STARTING] Server is starting...")
+        print('[STARTING] Server is starting...')
         self._shutdown = False
 
         # setup client socket
@@ -91,15 +91,13 @@ class Server:
         monitor_listener_thread.start()
         sim_thread.start()
 
-        print("[STARTING] DONE!")
-
+        print('[STARTING] DONE!')
 
         # 2. RUN: Wait until simulation thread finished
         sim_thread.join()  # run simulation loop in separate thread to isolate exceptions and allow the main thread to clean up
 
-
         # 3. CLEANUP: Shutdown everything and wait for socket threads to finish
-        print("[SHUTDOWN] Server is shutting down...")
+        print('[SHUTDOWN] Server is shutting down...')
         self._shutdown = True
 
         # shutdown client and monitor sockets
@@ -121,19 +119,19 @@ class Server:
         for client in self._clients:
             client.shutdown(no_wait=False)
         self._clients.clear()
-        print("[SHUTDOWN] - Clients.")
+        print('[SHUTDOWN] - Clients.')
 
         # shutdown active monitors
         for monitor in self._monitors:
             monitor.shutdown(no_wait=False)
         self._monitors.clear()
-        print("[SHUTDOWN] - Monitors.")
+        print('[SHUTDOWN] - Monitors.')
 
         # cleanup socket refs
         self._client_sock = None
         self._monitor_sock = None
 
-        print("[SHUTDOWN] DONE!")
+        print('[SHUTDOWN] DONE!')
 
     def shutdown(self) -> None:
         """
@@ -142,7 +140,7 @@ class Server:
 
         self._shutdown = True
 
-        print("[INFO] Shutdown requested.")
+        print('[INFO] Shutdown requested.')
 
     def _listen_for_clients(self) -> None:
         """
@@ -154,7 +152,7 @@ class Server:
         if self._client_sock is None:
             return
 
-        print("[STARTING] - Client connection listener...")
+        print('[STARTING] - Client connection listener...')
         while not self._shutdown:
             try:
                 sock, addr = self._client_sock.accept()
@@ -162,7 +160,7 @@ class Server:
                 self._shutdown = True
                 break
 
-            print(f"[CLIENT] {addr} connected.")
+            print(f'[CLIENT] {addr} connected.')
 
             conn = TCPLPMConnection(sock, addr)
             client = SimClient(conn)
@@ -170,7 +168,7 @@ class Server:
             # TODO: synchronize threads when accessing client list
             self._clients.append(client)
 
-        print("[SHUTDOWN] - Client listener thread.")
+        print('[SHUTDOWN] - Client listener thread.')
         self._client_sock.close()
 
     def _listen_for_monitors(self) -> None:
@@ -183,7 +181,7 @@ class Server:
         if self._monitor_sock is None:
             return
 
-        print("[STARTING] - Monitor connection listener...")
+        print('[STARTING] - Monitor connection listener...')
         while not self._shutdown:
             try:
                 sock, addr = self._monitor_sock.accept()
@@ -191,7 +189,7 @@ class Server:
                 self._shutdown = True
                 break
 
-            print(f"[MONITOR] {addr} connected.")
+            print(f'[MONITOR] {addr} connected.')
 
             conn = TCPLPMConnection(sock, addr)
             monitor = MonitorClient(conn)
@@ -199,7 +197,7 @@ class Server:
             # TODO: synchronize threads when accessing monitor list
             self._monitors.append(monitor)
 
-        print("[SHUTDOWN] - Monitor listener thread.")
+        print('[SHUTDOWN] - Monitor listener thread.')
         self._monitor_sock.close()
 
     def _run_simulation(self) -> None:
@@ -209,7 +207,7 @@ class Server:
         Method executed by main thread.
         """
 
-        print("[STARTING] - Simulation loop...")
+        print('[STARTING] - Simulation loop...')
 
         # load soccer pitch spec
         spec = self._spec_provider.load_environment('soccer')
@@ -321,7 +319,7 @@ class Server:
             # sleep to match simulation interval
             if self.real_time:
                 time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
-                cycle_start: float = time.time()
+                cycle_start = time.time()
 
             # collect client actions and send perceptions
             for client in active_clients:
@@ -382,7 +380,7 @@ class Server:
             for monitor in monitors_to_remove:
                 self._monitors.remove(monitor)
 
-        print("[INFO] Simulation thread finished.")
+        print('[INFO] Simulation thread finished.')
 
     def _generate_perceptions(self, active_clients: list[SimClient], mj_data: Any) -> None:
         """

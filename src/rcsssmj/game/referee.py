@@ -24,7 +24,7 @@ class SoccerReferee:
 
         self._team_players: dict[int, list[int]] = {
             TeamSide.LEFT.value: [],
-            TeamSide.RIGHT.value: []
+            TeamSide.RIGHT.value: [],
         }
 
     def get_rules(self) -> SoccerRules:
