@@ -1,4 +1,3 @@
-import sys
 import time
 from itertools import cycle
 from queue import Queue
@@ -16,13 +15,15 @@ class MujocoMonitor(SimMonitor):
     Internal monitor component.
     """
 
-    def __init__(self, model: Any, dt: float) -> None:
+    def __init__(self, model: Any, render_interval: int) -> None:
         """
         Construct a new internal monitor viewer.
         """
 
         self.model = model
-        self.dt = dt
+        self.render_interval: int = render_interval
+        self.render_ttl: int = 0
+        self.fps: float = 0.0
 
         self.button_left: bool = False
         self.button_right: bool = False
@@ -30,15 +31,10 @@ class MujocoMonitor(SimMonitor):
         self.last_x: int = 0
         self.last_y: int = 0
         self.frames: int = 0
-        self.loop_count: float = 0.0
-        self.target_render_time: float = 1 / 30.
-        self.time_per_render = self.target_render_time
+        self.last_render_time: float = time.time()
 
         self.command_queue: Queue[MonitorCommand] = Queue()
-        self.run_speed_factor: float = 1.0
-        self.paused: bool = False
         self.hide_menu: bool = False
-        self.overlay: dict[Any, list[str]] = {}
         self.font_scale = 100
 
         glfw.init()
@@ -70,12 +66,14 @@ class MujocoMonitor(SimMonitor):
         self.viewport = mujoco.MjrRect(0, 0, framebuffer_width, framebuffer_height)
         self.context = mujoco.MjrContext(model, mujoco.mjtFontScale(self.font_scale))
 
+        self._shutdown: bool = False
+
     def is_active(self) -> bool:
         """
         Check if the monitor is still active.
         """
 
-        return True
+        return not self._shutdown
 
     def get_command_queue(self) -> Queue[MonitorCommand]:
         """
@@ -91,8 +89,10 @@ class MujocoMonitor(SimMonitor):
 
         del no_wait  # signal unused parameter
 
-        self.close()
-        self.stop()
+        self._shutdown = True
+
+        glfw.set_window_should_close(self.window, True)
+        glfw.destroy_window(self.window)
 
     def update(self, mj_model: Any, mj_data: Any) -> None:
         """
@@ -146,16 +146,10 @@ class MujocoMonitor(SimMonitor):
         if act != glfw.RELEASE:
             return
 
-        if key == glfw.KEY_SPACE:
-            self.paused = not self.paused
         elif key == glfw.KEY_H:
             self.hide_menu = not self.hide_menu
         elif key == glfw.KEY_TAB:
             self.camera_mode_target = next(self.camera_mode_iter)
-        elif key == glfw.KEY_S:
-            self.run_speed_factor /= 2.0
-        elif key == glfw.KEY_F:
-            self.run_speed_factor *= 2.0
         elif key == glfw.KEY_K:
             self.command_queue.put(KickOffCommand(0))
         elif key == glfw.KEY_J:
@@ -175,83 +169,69 @@ class MujocoMonitor(SimMonitor):
         Render function.
         """
 
-        def render_inner_loop(self: MujocoMonitor) -> None:
-            self.create_overlay()
-            render_start = time.time()
+        if self._shutdown:
+            # prevent rendering after shutdown
+            return
 
-            mujoco.mjv_updateScene(self.model, data, self.scene_option, None, self.camera,
-                                   mujoco.mjtCatBit.mjCAT_ALL,
-                                   self.scene)
+        # decrement render ttl
+        self.render_ttl -= 1
+
+        if self.render_ttl <= 0:
+            # reset render ttl
+            self.render_ttl = self.render_interval
+
+            # calculate fps
+            current_time = time.time()
+            fps = 1 / (current_time - self.last_render_time)
+            self.last_render_time = current_time
+            self.fps = (self.fps * 10 + fps) / 11
+
+            # render scene
+            mujoco.mjv_updateScene(self.model, data, self.scene_option, None, self.camera, mujoco.mjtCatBit.mjCAT_ALL, self.scene)
             self.viewport.width, self.viewport.height = glfw.get_framebuffer_size(self.window)
             mujoco.mjr_render(self.viewport, self.scene, self.context)
 
+            # render overlays
             if not self.hide_menu:
-                for gridpos, [t1, t2] in self.overlay.items():
+                overlays = self.create_overlays()
+                for gridpos, [t1, t2] in overlays.items():
                     mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_SHADOW, gridpos, self.viewport, t1, t2, self.context)
 
             glfw.swap_buffers(self.window)
             glfw.poll_events()
 
             self.frames += 1
-            self.overlay.clear()
+            self.set_camera()
 
             if glfw.window_should_close(self.window):
-                self.stop()
-                sys.exit(0)
+                self.shutdown()
 
-            time.sleep(max(0, self.target_render_time - (time.time() - render_start) - 0.0002))
-            self.time_per_render = time.time() - render_start
-
-        if self.paused:
-            while self.paused:
-                render_inner_loop(self)
-
-        self.loop_count += self.dt / (self.time_per_render * self.run_speed_factor)
-        while self.loop_count > 0:
-            render_inner_loop(self)
-            self.set_camera()
-            self.loop_count -= 1
-
-    def stop(self) -> None:
+    def create_overlays(self) -> dict[Any, list[str]]:
         """
-        Stop monitor.
+        Create overlays dictionary.
         """
 
-        glfw.destroy_window(self.window)
-
-    def close(self) -> None:
-        """
-        Close monitor window.
-        """
-
-        glfw.set_window_should_close(self.window, True)
-
-    def create_overlay(self) -> None:
-        """
-        Set overlay entries.
-        """
+        overlays: dict[Any, list[str]] = {}
 
         topleft = mujoco.mjtGridPos.mjGRID_TOPLEFT
         bottomright = mujoco.mjtGridPos.mjGRID_BOTTOMRIGHT
 
-        self.overlay[bottomright] = ["Framerate:", str(int(1/self.time_per_render * self.run_speed_factor))]
-        self.overlay[topleft] = ["", ""]
-        self.overlay[topleft][0] += 'Press K for "Kick-Off Left".\n'
-        self.overlay[topleft][1] += "\n"
-        self.overlay[topleft][0] += 'Press J for "Kick-Off Right".\n'
-        self.overlay[topleft][1] += "\n"
-        self.overlay[topleft][0] += 'Press B for "Drop-Ball".\n'
-        self.overlay[topleft][1] += "\n"
-        self.overlay[topleft][0] += "Press SPACE to pause.\n"
-        self.overlay[topleft][1] += "\n"
-        self.overlay[topleft][0] += "Press H to hide the menu.\n"
-        self.overlay[topleft][1] += "\n"
-        self.overlay[topleft][0] += "Press TAB to switch cameras.\n"
-        self.overlay[topleft][1] += "\n"
-        self.overlay[topleft][0] += "Camera mode:\n"
-        self.overlay[topleft][1] += self.camera_mode+"\n"
-        self.overlay[topleft][0] += f"Run speed = {self.run_speed_factor:.3f} x real time"
-        self.overlay[topleft][1] += "[S]lower, [F]aster"
+        overlays[bottomright] = ["Framerate:", str(int(self.fps))]
+        overlays[topleft] = ["", ""]
+        overlays[topleft][0] += 'Press K for "Kick-Off Left".\n'
+        overlays[topleft][1] += "\n"
+        overlays[topleft][0] += 'Press J for "Kick-Off Right".\n'
+        overlays[topleft][1] += "\n"
+        overlays[topleft][0] += 'Press B for "Drop-Ball".\n'
+        overlays[topleft][1] += "\n"
+        overlays[topleft][0] += "Press H to hide the menu.\n"
+        overlays[topleft][1] += "\n"
+        overlays[topleft][0] += "Press TAB to switch cameras.\n"
+        overlays[topleft][1] += "\n"
+        overlays[topleft][0] += "Camera mode:\n"
+        overlays[topleft][1] += self.camera_mode + "\n"
+
+        return overlays
 
     def set_camera(self) -> None:
         """
@@ -259,19 +239,19 @@ class MujocoMonitor(SimMonitor):
         """
 
         if self.camera_mode_target == "static" and self.camera_mode != "static":
-                self.camera.fixedcamid = 0
-                self.camera.type = mujoco.mjtCamera.mjCAMERA_FREE
-                self.camera.trackbodyid = -1
-                self.camera.distance = 15.0
-                self.camera.elevation = -45.0
-                self.camera.azimuth = 90.0
+            self.camera.fixedcamid = 0
+            self.camera.type = mujoco.mjtCamera.mjCAMERA_FREE
+            self.camera.trackbodyid = -1
+            self.camera.distance = 15.0
+            self.camera.elevation = -45.0
+            self.camera.azimuth = 90.0
 
         if self.camera_mode_target == "follow" and self.camera_mode != "follow":
-                self.camera.fixedcamid = -1
-                self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-                self.camera.trackbodyid = 0
-                self.camera.distance = 3.5
-                self.camera.elevation = 0.0
-                self.camera.azimuth = 90.0
+            self.camera.fixedcamid = -1
+            self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+            self.camera.trackbodyid = 0
+            self.camera.distance = 3.5
+            self.camera.elevation = 0.0
+            self.camera.azimuth = 90.0
 
         self.camera_mode = self.camera_mode_target

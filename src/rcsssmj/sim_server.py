@@ -2,6 +2,7 @@ import socket
 from math import degrees
 from queue import Empty
 from threading import Thread
+import time
 from typing import TYPE_CHECKING, Any, Final, cast
 
 import mujoco
@@ -37,7 +38,6 @@ class Server:
         self.client_port: Final[int] = client_port
         self.monitor_port: Final[int] = monitor_port
         self.render: Final[bool] = render
-        self.sim_frequency: Final[int] = 100
         self.sync_mode: Final[bool] = False
         self.real_time: Final[bool] = True
 
@@ -220,13 +220,14 @@ class Server:
         mj_model = spec.compile()
         mj_data = mujoco.MjData(mj_model)
         n_substeps = 5
+        sim_timestep: float = mj_model.opt.timestep * n_substeps
 
         # create internal monitor
         if self.render:
-            dt = mj_model.opt.timestep * n_substeps
-            self._monitors.append(MujocoMonitor(mj_model, dt))
+            self._monitors.append(MujocoMonitor(mj_model, 2))
 
         needs_recompile: bool = False
+        cycle_start: float = time.time() - sim_timestep
 
         # simulation loop
         while not self._shutdown:
@@ -316,6 +317,11 @@ class Server:
 
             # generate perceptions
             self._generate_perceptions(active_clients, mj_data)
+
+            # sleep to match simulation interval
+            if self.real_time:
+                time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
+                cycle_start: float = time.time()
 
             # collect client actions and send perceptions
             for client in active_clients:
