@@ -38,6 +38,12 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.urls]
+Homepage = "https://gitlab.com/robocup-sim/rcssservermj"
+Documentation = "https://gitlab.com/robocup-sim/rcssservermj"
+Repository = "https://gitlab.com/robocup-sim/rcssservermj/-/tree/master"
+Issues = "https://gitlab.com/robocup-sim/rcssservermj/-/issues"
+
 [project.scripts]
 mjrcssserver = "rcsssmj.__main__:soccer_sim"
 

@@ -1,23 +1,24 @@
 from abc import ABC, abstractmethod
 
 from rcsssmj.client.action import BeamAction, InitRequest, MotorAction, SayAction, SimAction
+from rcsssmj.utils.sexpression import SExpression
 
 
 class ActionParser(ABC):
     """
-    Base class for action message parsers.
+    Base class for client action message parsers.
     """
 
     @abstractmethod
     def parse_init(self, data: bytes | bytearray) -> InitRequest | None:
         """
-        Parse an initialization message.
+        Parse a client initialization message.
         """
 
     @abstractmethod
     def parse_action(self, data: bytes | bytearray, model_prefix: str) -> list[SimAction]:
         """
-        Parse an action message.
+        Parse a client action message.
         """
 
 
@@ -33,20 +34,17 @@ class SExprActionParser(ActionParser):
         (init <robot_model> <team_name> <player_no>)
         """
 
-        msg = data.decode()
+        try:
+            node: SExpression = SExpression.from_array(data).get_expr(0)
 
-        if msg[0:5] != '(init' or msg[-1] != ')':
+            if node[0] != b'init' or len(node) != 4:
+                return None
+
+            model_name: str = node.get_str(1)
+            team_name: str = node.get_str(2)
+            player_no: int = abs(node.get_int(3)) % 100
+        except Exception:
             return None
-
-        splits = msg[6:-1].split(' ')
-
-        if len(splits) != 3:
-            return None
-
-        # set client specific attributes
-        model_name: str = splits[0]
-        team_name: str = splits[1]
-        player_no: int = abs(int(splits[2])) % 100
 
         return InitRequest(model_name, team_name, player_no)
 
@@ -58,61 +56,35 @@ class SExprActionParser(ActionParser):
         actions: list[SimAction] = []
 
         # parse individual actions from message
-        idx = 0
         try:
-            while idx < len(data):
-                chunks, idx = self._parse_node(data, idx)
+            node: SExpression = SExpression.from_array(data)
 
-                if chunks[0] == b'beam':
+            for child in node:
+                if not isinstance(child, SExpression):
+                    continue
+
+                n_elements = len(child)
+
+                if child[0] == b'beam':
                     # beam action (beam <x> <y> <theta>)
-                    if len(chunks) == 4:
-                        actions.append(BeamAction(model_prefix + 'beam', (float(chunks[1]), float(chunks[2]), float(chunks[3]))))
+                    if n_elements == 4:
+                        actions.append(BeamAction(model_prefix + 'beam', (child.get_float(1), child.get_float(2), child.get_float(3))))
 
-                elif chunks[0] == b'say':
+                elif child[0] == b'say':
                     # say action: (say <message>)
-                    if len(chunks) > 1:
-                        actions.append(SayAction(model_prefix + 'say', ' '.join([chunk.decode() for chunk in chunks[1:]])))
+                    if n_elements > 1:
+                        actions.append(SayAction(model_prefix + 'say', ' '.join([child.get_str(i) for i in range(1, n_elements)])))
 
-                elif chunks[0] == b'syn':
+                elif child[0] == b'syn':
                     # sync action: (syn)
                     pass
 
-                elif len(chunks) == 2:
+                elif n_elements == 2:
                     # joint action: (<name> <velocity>)
-                    actions.append(MotorAction(model_prefix + chunks[0].decode(), float(chunks[1])))
+                    actions.append(MotorAction(model_prefix + child.get_str(0), child.get_float(1)))
 
-        except RuntimeError:
+        except Exception:
             # error while parsing
             pass
 
         return actions
-
-    def _parse_node(self, data: bytes | bytearray, start: int) -> tuple[list[bytes | bytearray], int]:
-        """
-        Try parsing an expression node.
-        """
-
-        if data[start] != ord('('):
-            raise RuntimeError
-
-        chunks: list[bytes | bytearray] = []
-        start_idx: int = start + 1
-        idx: int = start_idx
-
-        while idx < len(data):
-            if data[idx] == ord(' '):
-                if idx > start_idx:
-                    chunks.append(data[start_idx:idx])
-                start_idx = idx + 1
-            if data[idx] == ord(')'):
-                if idx > start_idx:
-                    chunks.append(data[start_idx:idx])
-                return chunks, idx + 1
-            if data[idx] == ord('('):
-                raise RuntimeError
-            idx += 1
-
-        if idx > start_idx:
-            chunks.append(data[start_idx:idx])
-
-        return chunks, idx
