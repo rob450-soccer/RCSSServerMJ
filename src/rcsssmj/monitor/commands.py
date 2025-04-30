@@ -53,3 +53,26 @@ class DropBallCommand(MonitorCommand):
 
         # referee.request_drop_ball()
         print('[COMMAND] "drop-ball"')
+
+
+class SetPlayModeCommand(MonitorCommand):
+    """
+    The set-play-mode command.
+    """
+
+    def __init__(self, play_mode: str) -> None:
+        """
+        Construct a new set-play-mode command.
+        """
+
+        super().__init__()
+
+        self.play_mode: Final[str] = play_mode
+
+    def perform(self, referee: SoccerReferee, mj_data: Any) -> None:
+        """
+        Perform this command.
+        """
+
+        # referee.request_play_mode(self.play_mode)
+        print(f'[COMMAND] "play-mode": {self.play_mode}')

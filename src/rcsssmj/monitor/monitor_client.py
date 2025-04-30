@@ -4,6 +4,7 @@ from typing import Any
 
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.monitor.commands import MonitorCommand
+from rcsssmj.monitor.parser import CommandParser, SExprCommandParser
 from rcsssmj.monitor.sim_monitor import SimMonitor
 
 
@@ -18,6 +19,7 @@ class MonitorClient(SimMonitor):
         """
 
         self._conn: TCPLPMConnection = conn
+        self._parser: CommandParser = SExprCommandParser()
 
         self._receive_thread: Thread = Thread(target=self._receive_loop)
 
@@ -67,11 +69,16 @@ class MonitorClient(SimMonitor):
             try:
                 msg = self._conn.receive_message()
             except ConnectionError:
-                print('Monitor connection closed!')
+                # print('Monitor connection closed!')
                 break
 
-            # TODO: process command message
+            # parse commands
+            commands = self._parser.parse(msg)
+
+            # forward commands
+            for command in commands:
+                self._command_queue.put(command)
 
         self._conn.close()
 
-        print('Monitor thread ended!')
+        # print('Monitor thread ended!')
