@@ -12,10 +12,10 @@ Video: [https://youtu.be/iYWw7vATQU4](https://youtu.be/iYWw7vATQU4)
 
 ### Development Installation
 
-This project uses [hatch / hatchling](https://hatch.pypa.io) as project management tool.  
-You can install _hatchling_ via your package manager or `pip install hatchling`.
+This project uses [hatch](https://hatch.pypa.io) as project management tool.  
+You can install _hatch_ via your package manager or `pip install hatch` (or `pipx install hatch` on managed systems).
 
-After installing _hatchling_, navigate to your local repository and run arbitrary scripts in isolated virtual environments via the _hatch run_ command (e.g. `hatch run mjrcssserver` for running the server with default parameter).
+After installing _hatch_, navigate to your local repository and run arbitrary scripts in isolated virtual environments via the _hatch run_ command (e.g. `hatch run mjrcssserver` for running the server with default parameter).
 
 ### Local Installation
 
