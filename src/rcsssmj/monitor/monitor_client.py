@@ -1,3 +1,4 @@
+import logging
 from queue import Queue
 from threading import Thread
 from typing import Any
@@ -6,6 +7,8 @@ from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import CommandParser, SExprCommandParser
 from rcsssmj.monitor.sim_monitor import SimMonitor
+
+logger = logging.getLogger(__name__)
 
 
 class MonitorClient(SimMonitor):
@@ -69,7 +72,7 @@ class MonitorClient(SimMonitor):
             try:
                 msg = self._conn.receive_message()
             except ConnectionError:
-                # print('Monitor connection closed!')
+                logger.debug('Monitor connection %s closed!', self._conn.addr)
                 break
 
             # parse commands
@@ -81,4 +84,4 @@ class MonitorClient(SimMonitor):
 
         self._conn.close()
 
-        # print('Monitor thread ended!')
+        logger.debug('Monitor thread for %s finished!', self._conn.addr)

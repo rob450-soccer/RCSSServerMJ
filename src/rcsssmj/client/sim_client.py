@@ -1,3 +1,5 @@
+import logging
+import socket
 from collections.abc import Sequence
 from enum import Enum
 from queue import Queue
@@ -10,6 +12,8 @@ from rcsssmj.client.encoder import PerceptionEncoder, SExprPerceptionEncoder
 from rcsssmj.client.parser import ActionParser, SExprActionParser
 from rcsssmj.client.perception import Perception
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
+
+logger = logging.getLogger(__name__)
 
 
 class SimClientState(Enum):
@@ -68,6 +72,13 @@ class SimClient:
 
         # start receive loop
         self._receive_thread.start()
+
+    def get_addr(self) -> socket.AddressInfo:
+        """
+        Return the client address information.
+        """
+
+        return self._conn.addr
 
     def get_state(self) -> SimClientState:
         """
@@ -169,7 +180,7 @@ class SimClient:
         msg = self._encoder.encode(self._perceptions)
         if not msg:
             # encoding failed or resulted in an empty message
-            print(f'WARNING: Perception message encoding for {self._team_name} {self._player_no} failed!')
+            logger.warning('Perception message encoding for %s %d failed!', self._team_name, self._player_no)
             msg = b'(error)'
 
         # print(f'Sending perception to client "{self._team_name} {self._player_no}": {msg}')
@@ -186,7 +197,7 @@ class SimClient:
             try:
                 msg = self._conn.receive_message()
             except ConnectionError:
-                # print('Client connection closed!')
+                logger.debug('Client connection %s closed!', self._conn.addr)
                 break
 
             if self._state == SimClientState.CONNECTED:
@@ -194,7 +205,7 @@ class SimClient:
                 init_action = self._parser.parse_init(msg)
 
                 if init_action is None:
-                    print('Client initialization failed! Disconnecting!')
+                    logger.warning('Initialization for client %s failed! Disconnecting!', self._conn.addr)
                     self._conn.shutdown()
                     break
 
@@ -224,4 +235,4 @@ class SimClient:
         self._action_queue.put([])
         self._action_queue.put([])
 
-        # print('Client thread ended!')
+        logger.debug('Client thread for %s finished!', self._conn.addr)

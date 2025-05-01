@@ -1,8 +1,11 @@
+import logging
 from abc import ABC, abstractmethod
 from random import randint
 
 from rcsssmj.monitor.commands import DropBallCommand, KickOffCommand, MonitorCommand, SetPlayModeCommand
 from rcsssmj.utils.sexpression import SExpression
+
+logger = logging.getLogger(__name__)
 
 
 class CommandParser(ABC):
@@ -73,8 +76,8 @@ class SExprCommandParser(CommandParser):
                     # Note: Relates to simulation server instead of referee... but the referee might trigger a shutdown of the simulation
                     pass
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             # error while parsing
-            pass
+            logger.debug('Error parsing command message for monitor.', exc_info=True)
 
         return commands

@@ -1,7 +1,10 @@
+import logging
 from abc import ABC, abstractmethod
 
 from rcsssmj.client.action import BeamAction, InitRequest, MotorAction, SayAction, SimAction
 from rcsssmj.utils.sexpression import SExpression
+
+logger = logging.getLogger(__name__)
 
 
 class ActionParser(ABC):
@@ -43,7 +46,7 @@ class SExprActionParser(ActionParser):
             model_name: str = node.get_str(1)
             team_name: str = node.get_str(2)
             player_no: int = abs(node.get_int(3)) % 100
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
         return InitRequest(model_name, team_name, player_no)
@@ -83,8 +86,8 @@ class SExprActionParser(ActionParser):
                     # joint action: (<name> <velocity>)
                     actions.append(MotorAction(model_prefix + child.get_str(0), child.get_float(1)))
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             # error while parsing
-            pass
+            logger.debug('Error parsing action message for model: %s.', model_prefix, exc_info=True)
 
         return actions

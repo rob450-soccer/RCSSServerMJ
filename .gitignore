@@ -12,3 +12,6 @@ dist/
 
 # mujoco log
 MUJOCO_LOG.TXT
+
+# logfiles
+console.log

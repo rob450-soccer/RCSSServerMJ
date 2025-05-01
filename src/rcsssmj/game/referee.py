@@ -1,4 +1,6 @@
-from math import pi
+import contextlib
+import logging
+from math import degrees, pi
 from typing import Any
 
 from rcsssmj.agent import AgentID, PAgent
@@ -7,6 +9,8 @@ from rcsssmj.game.game_state import GameState
 from rcsssmj.game.rules import SoccerRules
 from rcsssmj.game.soccer import TeamSide
 from rcsssmj.mjutils import place_robot_2d, place_robot_3d
+
+logger = logging.getLogger(__name__)
 
 
 class SoccerReferee:
@@ -78,25 +82,25 @@ class SoccerReferee:
 
         return agent_id
 
-    def spawn_agent(self, aid: AgentID, mj_data: Any) -> None:
+    def spawn_agent(self, agent_id: AgentID, mj_data: Any) -> None:
         """
         Place the given agent at a save (collision free) initial location.
         """
 
-        if not TeamSide.is_valid(aid.team_id):
+        if not TeamSide.is_valid(agent_id.team_id):
             msg = 'Invalid team!'
             raise ValueError(msg)
 
         # field_half_length = 32
         field_half_width = 24
 
-        x_sign = -1 if aid.team_id == TeamSide.LEFT.value else 1
-        pos = (x_sign * (2 * aid.player_no + 1), field_half_width + 2, 1.2)
+        x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
+        pos = (x_sign * (2 * agent_id.player_no + 1), field_half_width + 2, 1.2)
         quat = (1, 0, 0, 0)
 
-        # print(f'Spawn Team #{aid.team_id} Player #{aid.player_no:02d} @ {pos}')
+        logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], pos[2])
 
-        place_robot_3d(aid.prefix, mj_data, pos, quat)
+        place_robot_3d(agent_id.prefix, mj_data, pos, quat)
 
     def handle_withdrawal(self, aid: AgentID) -> None:
         """
@@ -104,10 +108,8 @@ class SoccerReferee:
         """
 
         if TeamSide.is_valid(aid.team_id):
-            try:
+            with contextlib.suppress(KeyError):
                 self._team_players[aid.team_id].remove(aid.player_no)
-            except KeyError:
-                pass
 
     def generate_perception(self) -> Perception:
         """
@@ -134,8 +136,11 @@ class SoccerReferee:
 
         x_factor = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
         theta_shift = 0 if agent_id.team_id == TeamSide.LEFT.value else pi
+        pose = (abs(beam_pose[0]) * x_factor, beam_pose[1], beam_pose[2] + theta_shift)
 
-        place_robot_2d(agent_id.prefix, mj_data, (abs(beam_pose[0]) * x_factor, beam_pose[1], beam_pose[2] + theta_shift))
+        logger.debug('Beam Team #%d Player #%02d to (%.3f, %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pose[0], pose[1], degrees(pose[2]))
+
+        place_robot_2d(agent_id.prefix, mj_data, pose)
 
     def referee(self, mj_data: Any) -> None:
         """

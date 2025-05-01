@@ -1,5 +1,8 @@
+import logging
 import socket
 from typing import Final
+
+logger = logging.getLogger(__name__)
 
 
 class TCPLPMConnection:
@@ -81,8 +84,8 @@ class TCPLPMConnection:
         # close and clear socket on shutdown
         try:
             self.sock.shutdown(socket.SHUT_RDWR)
-        except:
-            print('ERROR shutting down socket!')
+        except Exception:  # noqa: BLE001
+            logger.debug('ERROR shutting down socket!', exc_info=True)
 
     def close(self) -> None:
         """
