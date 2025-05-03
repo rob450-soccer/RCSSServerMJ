@@ -1,14 +1,15 @@
 #!/bin/bash
 
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 arg1"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <team_name> [robot_model]"
     exit 1
 fi
 
-ARG1=$1
+TEAM=$1
+ROBOT_MODEL="${2:-ant}"
 
 for ((i=1; i<=11; i++))
 do
-    python mujoco_client.py -s localhost -p 60000 -t $ARG1 -n $i &
+    python mujoco_client.py -s localhost -p 60000 -t $TEAM -n $i -r $ROBOT_MODEL &
     # sleep 0.3
 done

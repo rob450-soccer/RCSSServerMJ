@@ -1,13 +1,26 @@
 import argparse
+import logging
 import signal
 import socket
 import threading
-import time
 from collections.abc import Mapping
 from types import FrameType
 from typing import ClassVar
 
 import numpy as np
+
+# ---------- LOGGING CONFIG ----------
+# console handler
+ch = logging.StreamHandler()
+ch.setFormatter(logging.Formatter('[%(levelname)s] %(message)s'))
+ch.setLevel(logging.INFO)
+
+# configure logging
+logging.basicConfig(handlers=[ch], level=logging.DEBUG)
+# ---------- LOGGING CONFIG ----------
+
+
+logger = logging.getLogger(__name__)
 
 
 class Client:
@@ -15,7 +28,7 @@ class Client:
     Example client performing random actions.
     """
 
-    _BEAM_POSES: ClassVar[Mapping[int, tuple[float, float, float]]] = {
+    BEAM_POSES: ClassVar[Mapping[int, tuple[float, float, float]]] = {
         1: (29.0, 0.0, 0),
         2: (22.0, 12.0, 0),
         3: (22.0, 4.0, 0),
@@ -29,7 +42,11 @@ class Client:
         11: (7.0, 0.0, 0),
     }
 
-    def __init__(self, host: str, port: int, team: str, player_no: int):
+    ROBOT_MOTORS: ClassVar[Mapping[str, tuple[str, ...]]] = {
+        'ant': ('l4e1', 'l4e2', 'l1e1', 'l1e2', 'l2e1', 'l2e2', 'l3e1', 'l3e2'),
+    }
+
+    def __init__(self, host: str, port: int, team: str, player_no: int, model_name: str | None = None):
         """
         Construct a new agent connecting to the given server.
         """
@@ -37,7 +54,7 @@ class Client:
         self._host: str = host
         self._port: int = port
 
-        self._model_name: str = 'ant'
+        self._model_name: str = 'ant' if model_name is None else model_name
         self._team: str = team
         self._player_no: int = player_no
 
@@ -50,15 +67,19 @@ class Client:
         # set TCP_NODELAY option to send messages immediately (without buffering)
         self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-        print('[CONNECTED] Connected to the server.')
-
     def run(self):
         """
         Run the simulation client.
         """
 
         # connect to server
-        self._sock.connect((self._host, self._port))
+        logger.info('Connecting to server at %s:%d...', self._host, self._port)
+        try:
+            self._sock.connect((self._host, self._port))
+        except ConnectionRefusedError:
+            logger.error('Connection refused. Make sure the server is running and listening on the specified interface.')  # noqa: TRY400
+            return
+        # logger.info('Server connection established.')
 
         # create client thread
         client_thread = threading.Thread(target=self._action_loop)
@@ -66,6 +87,8 @@ class Client:
 
         # wait for client thread to finish
         client_thread.join()
+
+        # logger.info('Shutting down.')
 
         # close server connection
         self._sock.close()
@@ -82,11 +105,12 @@ class Client:
         Main loop of the agent.
         """
 
+        logger.info('Initializing agent...')
         init_msg = f'(init {self._model_name} {self._team} {self._player_no})'
         self._send_message(init_msg.encode())
+        # logger.info('Initialization complete.')
 
-        print('[TEAM] Sent init message.')
-
+        logger.info('Running perception-action-loop.')
         while True:
             try:
                 # receive perception message
@@ -94,20 +118,25 @@ class Client:
                 # print(perception_msg.decode())
 
                 # perform action
-                action = np.random.uniform(-1, 1, 8)  # random action
-                # action = np.zeros(8)  # zero action
-                action_msg = f'(l4e1 {action[0]:.2f})(l4e2 {action[1]:.2f})(l1e1 {action[2]:.2f})(l1e2 {action[3]:.2f})(l2e1 {action[4]:.2f})(l2e2 {action[5]:.2f})(l3e1 {action[6]:.2f})(l3e2 {action[7]:.2f})'
+                motors = self.ROBOT_MOTORS[self._model_name]
+                actions = np.random.uniform(-1, 1, len(motors))  # random action
+                # actions = np.zeros(len(motors))  # zero action
+
+                msg_list: list[str] = []
+                for motor, action in zip(motors, actions, strict=False):
+                    msg_list.append(f'({motor} {action:.2f})')
 
                 if not self._has_beamed:
-                    # action_msg += '(beam ' + ' '.join([str(val) for val in Client.BEAM_POSES[self.player_id]]) + ')'
-                    beam_pose: tuple[float, float, float] = self._BEAM_POSES[self._player_no]
-                    action_msg += f'(beam {beam_pose[0]} {beam_pose[1]} {beam_pose[2]})'
+                    # msg_list.append('(beam ' + ' '.join([str(val) for val in self.BEAM_POSES[self.player_id]]) + ')')
+                    beam_pose = self.BEAM_POSES[self._player_no]
+                    msg_list.append(f'(beam {beam_pose[0]} {beam_pose[1]} {beam_pose[2]})')
                     self._has_beamed = True
 
                 # send action message
+                action_msg = ''.join(msg_list)
                 self._send_message(action_msg.encode())
             except Exception:
-                print('Connection closed.')
+                logger.info('Server connection closed.')
                 break
 
     def _send_message(self, msg: bytes | bytearray) -> None:
@@ -144,17 +173,20 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser(description='The RocoCup MuJoCo Soccer Simulation Example Client.')
 
+    robots = list(Client.ROBOT_MOTORS.keys())
+
     # fmt: off
     parser.add_argument('-s', '--host',      type=str, help='The server address.', default='127.0.0.1', required=False)
     parser.add_argument('-p', '--port',      type=int, help='The server port.',    default=60000,       required=False)
     parser.add_argument('-t', '--team',      type=str, help='The team name.',      default='Test',      required=False)
     parser.add_argument('-n', '--player_no', type=int, help='The player number.',  default=1,           required=False)
+    parser.add_argument('-r', '--robot',     type=str, help='The robot model.',    default=robots[0],   required=False, choices=robots)
     # fmt: on
 
     args = parser.parse_args()
 
     # create client
-    client = Client(args.host, args.port, args.team, args.player_no)
+    client = Client(args.host, args.port, args.team, args.player_no, args.robot)
 
     # register SIGINT handler
     def signal_handler(sig: int, frame: FrameType | int | signal.Handlers | None) -> None:
