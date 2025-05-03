@@ -99,7 +99,13 @@ class MujocoMonitor(SimMonitor):
         Update the monitor state.
         """
 
-        self.model = mj_model
+        if self.model is not mj_model:
+            self.model = mj_model
+
+            # recreate scene and context
+            self.scene = mujoco.MjvScene(self.model, 1000)
+            self.context = mujoco.MjrContext(self.model, mujoco.mjtFontScale(self.font_scale))
+
         self.render(mj_data)
 
     def mouse_button(self, window: Any, button: Any, act: Any, mods: Any) -> None:
