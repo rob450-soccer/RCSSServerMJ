@@ -45,6 +45,59 @@ class TimePerception(Perception):
         return f'(time ({self.name} {self.time}))'
 
 
+class PositionPerception(Perception):
+    """
+    A position perception.
+    """
+
+    def __init__(self, name: str, x: float, y: float, z: float) -> None:
+        """
+        Construct a new position perception.
+        """
+
+        super().__init__(name)
+
+        self.x: Final[float] = x
+        self.y: Final[float] = y
+        self.z: Final[float] = z
+
+    def to_sexp(self) -> str:
+        """
+        Return an symbolic expression representing this perception.
+
+        Expression format: (pos (name <name>) (p <x> <y> <z>))
+        """
+
+        return f'(pos (name {self.name}) (p {self.x} {self.y} {self.z}))'
+
+
+class OrientationPerception(Perception):
+    """
+    An orientation perception.
+    """
+
+    def __init__(self, name: str, qw: float, qx: float, qy: float, qz: float) -> None:
+        """
+        Construct a new orientation perception.
+        """
+
+        super().__init__(name)
+
+        self.qw: Final[float] = qw
+        self.qx: Final[float] = qx
+        self.qy: Final[float] = qy
+        self.qz: Final[float] = qz
+
+    def to_sexp(self) -> str:
+        """
+        Return an symbolic expression representing this perception.
+
+        Expression format: (quat (name <name>) (q <qw> <qx> <qy> <qz>))
+        """
+
+        return f'(quat (name {self.name}) (q {self.qw} {self.qx} {self.qy} {self.qz}))'
+
+
 class JointPerception(Perception):
     """
     A joint perception.

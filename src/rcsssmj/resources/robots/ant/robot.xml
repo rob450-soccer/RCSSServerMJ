@@ -2,11 +2,14 @@
 
 <mujoco model="ant">
   <compiler angle="degree" coordinate="local" inertiafromgeom="true"/>
+
   <option integrator="RK4" timestep="0.01"/>
+
   <default>
     <joint armature="1" damping="1" limited="true"/>
     <geom condim="3" density="5.0" friction="1 0.5 0.5" margin="0.01" rgba="0.8 0.6 0.4 1"/>
   </default>
+
   <worldbody>
     <body name="torso" pos="0 0 0">
       <site name="torso_site" pos="0 0 0"/>
@@ -59,6 +62,7 @@
       </body>
     </body>
   </worldbody>
+
   <actuator>
     <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l4e1" joint="hip_4" gear="150"/>
     <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l4e2" joint="ankle_4" gear="150"/>
@@ -69,7 +73,11 @@
     <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l3e1" joint="hip_3" gear="150"/>
     <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l3e2" joint="ankle_3" gear="150"/>
   </actuator>
+
   <sensor>
+    <framequat name="torso_quat" objtype="site" objname="torso_site"/><!-- Used for ground-truth perception of robot orientation.-->
+    <framepos name="torso_pos" objtype="site" objname="torso_site"/><!-- Used for ground-truth perception of robot position.-->
+
     <gyro name="torso_gyro" site="torso_site"/>
     <accelerometer name="torso_acc" site="torso_site"/>
     <jointpos name="l4j1" joint="hip_4"/>

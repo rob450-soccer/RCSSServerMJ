@@ -7,9 +7,10 @@ from threading import Thread
 from typing import TYPE_CHECKING, Any, Final, cast
 
 import mujoco
+import numpy as np
 
 from rcsssmj.agent import AgentID
-from rcsssmj.client.perception import AccelerometerPerception, GyroPerception, JointPerception, Perception, TimePerception, TouchPerception
+from rcsssmj.client.perception import AccelerometerPerception, GyroPerception, JointPerception, OrientationPerception, Perception, PositionPerception, TimePerception, TouchPerception
 from rcsssmj.client.sim_client import SimClient, SimClientState
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.game.referee import SoccerReferee
@@ -460,12 +461,20 @@ class Server:
             The current simulation state.
         """
 
-        def t2(val: float) -> float:
+        def trunc2(val: float) -> float:
             """Limit the given value to two digits."""
             return int(val * 100) / 100.0
 
+        def trunc2_vec(vec: Any) -> Any:
+            """Limit the given vector to two digits."""
+            return np.trunc(vec * 100) / 100.0
+
+        def trunc3_vec(vec: Any) -> Any:
+            """Limit the given vector to three digits."""
+            return np.trunc(vec * 1000) / 1000.0
+
         # generate general perceptions equal for all clients
-        sim_time_perception = TimePerception('now', t2(mj_data.time))
+        sim_time_perception = TimePerception('now', trunc2(mj_data.time))
         game_state_perception = self._referee.generate_perception()
 
         # generate client specific perceptions
@@ -481,19 +490,27 @@ class Server:
                 sensor_name = sensor_spec.name[prefix_length:]
 
                 if sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTPOS:
-                    perceptions.append(JointPerception(sensor_name, t2(degrees(sensor.data[0]))))
+                    perceptions.append(JointPerception(sensor_name, trunc2(degrees(sensor.data[0]))))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_GYRO:
-                    rvx, rvy, rvz = sensor.data
-                    perceptions.append(GyroPerception(sensor_name, t2(degrees(rvx)), t2(degrees(rvy)), t2(degrees(rvz))))
+                    rvx, rvy, rvz = trunc2_vec(np.degrees(sensor.data[0:3]))
+                    perceptions.append(GyroPerception(sensor_name, rvx, rvy, rvz))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
-                    ax, ay, az = sensor.data
-                    perceptions.append(AccelerometerPerception(sensor_name, t2(ax), t2(ay), t2(az)))
+                    ax, ay, az = trunc2_vec(sensor.data[0:3])
+                    perceptions.append(AccelerometerPerception(sensor_name, ax, ay, az))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_TOUCH:
                     active = int(sensor.data[0])
                     perceptions.append(TouchPerception(sensor_name, active))
+
+                elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
+                    qw, qx, qy, qz = trunc3_vec(sensor.data[0:4])
+                    perceptions.append(OrientationPerception(sensor_name, qw, qx, qy, qz))
+
+                elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEPOS:
+                    px, py, pz = trunc3_vec(sensor.data[0:3])
+                    perceptions.append(PositionPerception(sensor_name, px, py, pz))
 
                 # TODO: Add perceptions for force, vision and hear
 
