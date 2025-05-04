@@ -1,7 +1,10 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Final
 
 from rcsssmj.game.referee import SoccerReferee
+
+logger = logging.getLogger(__name__)
 
 
 class MonitorCommand(ABC):
@@ -38,7 +41,7 @@ class KickOffCommand(MonitorCommand):
         del mj_data  # signal unused parameter
 
         referee.request_kickoff(self.team_id)
-        print(f'[COMMAND] "kick-off" for team: {self.team_id}')
+        logger.info('[COMMAND] "kick-off" for team: %d', self.team_id)
 
 
 class DropBallCommand(MonitorCommand):
@@ -52,7 +55,7 @@ class DropBallCommand(MonitorCommand):
         """
 
         # referee.request_drop_ball()
-        print('[COMMAND] "drop-ball"')
+        logger.info('[COMMAND] "drop-ball"')
 
 
 class SetPlayModeCommand(MonitorCommand):
@@ -75,4 +78,4 @@ class SetPlayModeCommand(MonitorCommand):
         """
 
         # referee.request_play_mode(self.play_mode)
-        print(f'[COMMAND] "play-mode": {self.play_mode}')
+        logger.info('[COMMAND] "play-mode": %s', self.play_mode)

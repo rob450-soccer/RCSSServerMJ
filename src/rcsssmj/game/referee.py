@@ -84,8 +84,8 @@ class SoccerReferee:
             msg = 'Invalid team!'
             raise ValueError(msg)
 
-        # field_half_x = self.rules.field.field_dim[0]
-        field_half_y = self.rules.field.field_dim[1]
+        # field_half_x = self.rules.field.field_dim[0] / 2
+        field_half_y = self.rules.field.field_dim[1] / 2
         field_border = self.rules.field.field_border
 
         x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
