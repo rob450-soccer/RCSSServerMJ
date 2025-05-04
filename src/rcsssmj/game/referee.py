@@ -1,7 +1,7 @@
 import contextlib
 import logging
 from math import degrees, pi
-from typing import Any
+from typing import Any, Final
 
 from rcsssmj.agent import AgentID, PAgent
 from rcsssmj.client.perception import GameStatePerception, Perception
@@ -18,25 +18,18 @@ class SoccerReferee:
     A referee, applying soccer game rules.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, rules: SoccerRules) -> None:
         """
         Create a new game.
         """
 
-        self._rules: SoccerRules = SoccerRules()
+        self.rules: Final[SoccerRules] = rules
         self._state: GameState = GameState()
 
         self._team_players: dict[int, list[int]] = {
             TeamSide.LEFT.value: [],
             TeamSide.RIGHT.value: [],
         }
-
-    def get_rules(self) -> SoccerRules:
-        """
-        Return the game rules applied by the referee.
-        """
-
-        return self._rules
 
     def get_state(self) -> GameState:
         """
@@ -51,7 +44,7 @@ class SoccerReferee:
         """
 
         # check player number
-        if agent.get_player_no() > self._rules.max_player_no:
+        if agent.get_player_no() > self.rules.max_player_no:
             return None
 
         # update known team names
@@ -68,7 +61,7 @@ class SoccerReferee:
             return None
 
         # check if the new player would exceed the maximum number of allowed players per team
-        if len(self._team_players[team_id]) >= self._rules.max_team_size:
+        if len(self._team_players[team_id]) >= self.rules.max_team_size:
             return None
 
         agent_id = AgentID(team_id, agent.get_player_no())
@@ -91,11 +84,12 @@ class SoccerReferee:
             msg = 'Invalid team!'
             raise ValueError(msg)
 
-        # field_half_length = 32
-        field_half_width = 24
+        # field_half_x = self.rules.field.field_dim[0]
+        field_half_y = self.rules.field.field_dim[1]
+        field_border = self.rules.field.field_border
 
         x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
-        pos = (x_sign * (2 * agent_id.player_no + 1), field_half_width + 2, 1.2)
+        pos = (x_sign * (2 * agent_id.player_no + 1), field_half_y + field_border, 1.2)
         quat = (1, 0, 0, 0)
 
         logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], pos[2])
@@ -164,5 +158,5 @@ class SoccerReferee:
         Check if the game is over.
         """
 
-        if self._state.get_play_time() > self._rules.half_time:
+        if self._state.get_play_time() > self.rules.half_time:
             self._state.game_over()

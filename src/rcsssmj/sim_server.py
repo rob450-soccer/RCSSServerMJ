@@ -49,7 +49,8 @@ class Server:
 
     def __init__(
         self,
-        host: str,
+        referee: SoccerReferee,
+        host: str = '127.0.0.1',
         client_port: int = 60000,
         monitor_port: int = 60001,
         *,
@@ -82,6 +83,9 @@ class Server:
             Flag for enabling (default, True) or disabling (False) the internal monitor viewer.
         """
 
+        self.referee: Final[SoccerReferee] = referee
+        """The game referee responsible for managing the game aspect of the simulation."""
+
         self.host: Final[str] = host
         """The server host address."""
 
@@ -102,9 +106,6 @@ class Server:
 
         self._spec_provider: ModelSpecProvider = ModelSpecProvider()
         """Mujoco model specification provider for loading models."""
-
-        self._referee: SoccerReferee = SoccerReferee()
-        """The game referee responsible for managing the game aspect of the simulation."""
 
         self._clients: list[SimClient] = []
         """The list of connected clients."""
@@ -341,7 +342,7 @@ class Server:
                     needs_recompile = True
 
                     # remove agent from game
-                    self._referee.handle_withdrawal(agent_id)
+                    self.referee.handle_withdrawal(agent_id)
 
             # handle ready clients
             for client in ready_clients:
@@ -354,7 +355,7 @@ class Server:
                     continue
 
                 # request participation in game
-                agent_id = self._referee.request_participation(client, robot_spec)
+                agent_id = self.referee.request_participation(client, robot_spec)
                 if agent_id is None:
                     # invalid team side -> shutdown client
                     client.shutdown()
@@ -378,7 +379,7 @@ class Server:
 
             # initialize newly activated players
             for client in activated_clients:
-                self._referee.spawn_agent(cast(AgentID, client.get_id()), mj_data)
+                self.referee.spawn_agent(cast(AgentID, client.get_id()), mj_data)
 
             # generate perceptions
             self._generate_perceptions(active_clients, mj_data)
@@ -412,7 +413,7 @@ class Server:
 
             # apply client actions
             for action in client_actions:
-                action.perform(self._referee, mj_data)
+                action.perform(self.referee, mj_data)
 
             # progress simulation
             mujoco.mj_step(mj_model, mj_data, n_substeps)
@@ -423,12 +424,12 @@ class Server:
                 try:
                     while command_queue.qsize() > 0:
                         command = command_queue.get_nowait()
-                        command.perform(self._referee, mj_data)
+                        command.perform(self.referee, mj_data)
                 except Empty:
                     pass
 
             # call referee to judge the current simulation state and progress the game state
-            self._referee.referee(mj_data)
+            self.referee.referee(mj_data)
 
             # update connected monitors
             for monitor in active_monitors:
@@ -475,7 +476,7 @@ class Server:
 
         # generate general perceptions equal for all clients
         sim_time_perception = TimePerception('now', trunc2(mj_data.time))
-        game_state_perception = self._referee.generate_perception()
+        game_state_perception = self.referee.generate_perception()
 
         # generate client specific perceptions
         for client in active_clients:
