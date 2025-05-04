@@ -164,5 +164,5 @@ class SoccerReferee:
         Check if the game is over.
         """
 
-        if self._state.get_play_time() > self._rules.half_duration:
+        if self._state.get_play_time() > self._rules.half_time:
             self._state.game_over()
