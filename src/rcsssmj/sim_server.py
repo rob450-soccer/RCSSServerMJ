@@ -480,7 +480,8 @@ class Server:
 
         # generate client specific perceptions
         for client in active_clients:
-            perceptions: list[Perception] = [sim_time_perception, game_state_perception]
+            client.add_perception(sim_time_perception)
+            client.add_perception(game_state_perception)
 
             model_spec = cast(Any, client.get_model_spec())
             agent_id = cast(AgentID, client.get_id())
@@ -491,32 +492,30 @@ class Server:
                 sensor_name = sensor_spec.name[prefix_length:]
 
                 if sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTPOS:
-                    perceptions.append(JointPerception(sensor_name, trunc2(degrees(sensor.data[0]))))
+                    client.add_perception(JointPerception(sensor_name, trunc2(degrees(sensor.data[0]))))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_GYRO:
                     rvx, rvy, rvz = trunc2_vec(np.degrees(sensor.data[0:3]))
-                    perceptions.append(GyroPerception(sensor_name, rvx, rvy, rvz))
+                    client.add_perception(GyroPerception(sensor_name, rvx, rvy, rvz))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
                     ax, ay, az = trunc2_vec(sensor.data[0:3])
-                    perceptions.append(AccelerometerPerception(sensor_name, ax, ay, az))
+                    client.add_perception(AccelerometerPerception(sensor_name, ax, ay, az))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_TOUCH:
                     active = int(sensor.data[0])
-                    perceptions.append(TouchPerception(sensor_name, active))
+                    client.add_perception(TouchPerception(sensor_name, active))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
                     qw, qx, qy, qz = trunc3_vec(sensor.data[0:4])
-                    perceptions.append(OrientationPerception(sensor_name, qw, qx, qy, qz))
+                    client.add_perception(OrientationPerception(sensor_name, qw, qx, qy, qz))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEPOS:
                     px, py, pz = trunc3_vec(sensor.data[0:3])
-                    perceptions.append(PositionPerception(sensor_name, px, py, pz))
+                    client.add_perception(PositionPerception(sensor_name, px, py, pz))
 
                 # TODO: Add perceptions for force, vision and hear
 
                 else:
                     # sensor not supported...
                     pass
-
-            client.set_perceptions(perceptions)

@@ -1,6 +1,5 @@
 import logging
 import socket
-from collections.abc import Sequence
 from enum import Enum
 from queue import Queue
 from threading import Thread
@@ -67,7 +66,7 @@ class SimClient:
         self._agent_id: AgentID | None = None
         self._model_spec: Any | None = None
 
-        self._perceptions: Sequence[Perception] | None = None
+        self._perceptions: list[Perception] = []
         self._action_queue: Queue[list[SimAction]] = Queue()
 
         # start receive loop
@@ -155,15 +154,15 @@ class SimClient:
         if not no_wait:
             self._receive_thread.join()
 
-    def set_perceptions(self, perceptions: Sequence[Perception] | None) -> None:
+    def add_perception(self, perception: Perception) -> None:
         """
-        Set the agent perceptions for this simulation cycle.
+        Add the given perception to the agent perceptions for this simulation cycle.
 
         This method is called by the main simulation loop.
         """
 
-        # buffer perceptions
-        self._perceptions = perceptions
+        # buffer perception
+        self._perceptions.append(perception)
 
     def send_perceptions(self) -> None:
         """
@@ -172,16 +171,23 @@ class SimClient:
         This method is called by the main simulation loop.
         """
 
-        if not self._conn.is_active() or self._perceptions is None:
+        # fetch and reset perception list
+        perceptions = self._perceptions
+        self._perceptions = []
+
+        if not self._conn.is_active():
             # skip sending perception as the client connection is already closed
             return
 
         # encode perceptions message
-        msg = self._encoder.encode(self._perceptions)
-        if not msg:
+        msg = self._encoder.encode(perceptions)
+        if msg is None:
             # encoding failed or resulted in an empty message
             logger.warning('Perception message encoding for %s %d failed!', self._team_name, self._player_no)
             msg = b'(error)'
+        elif not msg:
+            # no perceptions encoded
+            msg = b'(syn)'
 
         # print(f'Sending perception to client "{self._team_name} {self._player_no}": {msg}')
 
