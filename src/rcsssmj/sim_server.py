@@ -1,6 +1,7 @@
 import logging
 import socket
 import time
+from collections.abc import Sequence
 from math import degrees
 from queue import Empty
 from threading import Thread
@@ -10,7 +11,7 @@ import mujoco
 import numpy as np
 
 from rcsssmj.agent import AgentID
-from rcsssmj.client.perception import AccelerometerPerception, GyroPerception, JointPerception, OrientationPerception, Perception, PositionPerception, TimePerception, TouchPerception
+from rcsssmj.client.perception import AccelerometerPerception, AgentDetection, GyroPerception, JointPerception, ObjectDetection, OrientationPerception, PObjectDetection, PositionPerception, TimePerception, TouchPerception, VisionPerception
 from rcsssmj.client.sim_client import SimClient, SimClientState
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.game.referee import SoccerReferee
@@ -100,6 +101,9 @@ class Server:
 
         self.real_time: Final[bool] = real_time
         """Flag for enabling / disabling real-time mode."""
+
+        self.vision_interval: Final[int] = 4
+        """The interval (in simulation cycles) in which the vision perception is generated."""
 
         self.render: Final[bool] = render
         """Flag for enabling / disabling the internal mujoco viewer monitor."""
@@ -288,10 +292,14 @@ class Server:
         n_substeps = 5
         sim_timestep: float = mj_model.opt.timestep * n_substeps
 
+        # extract visible object markers of world
+        world_markers = [(site.name, site.name[:-10]) for site in spec.sites if site.name.endswith('-vismarker')]
+
         # create internal monitor
         if self.render:
             self._monitors.append(MujocoMonitor(mj_model, 2))
 
+        frame_id: int = 0
         needs_recompile: bool = False
         cycle_start: float = time.time() - sim_timestep
 
@@ -386,7 +394,7 @@ class Server:
                 mujoco.mj_forward(mj_model, mj_data)
 
             # generate perceptions
-            self._generate_perceptions(active_clients, mj_data)
+            self._generate_perceptions(active_clients, mj_data, world_markers, gen_vision=(frame_id % self.vision_interval == 0))
 
             # sleep to match simulation interval
             if self.real_time:
@@ -452,9 +460,12 @@ class Server:
             for monitor in monitors_to_remove:
                 self._monitors.remove(monitor)
 
+            # increment frame id
+            frame_id += 1
+
         logger.info('Simulation thread finished.')
 
-    def _generate_perceptions(self, active_clients: list[SimClient], mj_data: Any) -> None:
+    def _generate_perceptions(self, active_clients: list[SimClient], mj_data: Any, world_markers: Sequence[tuple[str, str]] = [], *, gen_vision: bool = False) -> None:
         """Generate perceptions for active clients.
 
         Parameter
@@ -464,6 +475,12 @@ class Server:
 
         mj_data: mjData
             The current simulation state.
+
+        world_markers: Sequence[tuple[str, str]], default=[]
+            The list of visible world sites of the model.
+
+        gen_vision: bool, default=False
+            Generate vision perception.
         """
 
         def trunc2(val: float) -> float:
@@ -481,6 +498,19 @@ class Server:
         # generate general perceptions equal for all clients
         sim_time_perception = TimePerception('now', trunc2(mj_data.time))
         game_state_perception = self.referee.generate_perception()
+
+        if gen_vision:
+            # collect visible markers
+            n_world_markers = len(world_markers)
+            obj_markers = list(world_markers)
+            for client in active_clients:
+                obj_markers.extend(client.get_model_markers())
+
+            # extract visible object positions
+            n_markers = len(obj_markers)
+            obj_pos = np.zeros((3, n_markers), dtype=np.float64)
+            for idx, site in enumerate(obj_markers):
+                obj_pos[:, idx] = mj_data.site(site[0]).xpos.astype(np.float64)
 
         # generate client specific perceptions
         for client in active_clients:
@@ -518,8 +548,48 @@ class Server:
                     px, py, pz = trunc3_vec(sensor.data[0:3])
                     client.add_perception(PositionPerception(sensor_name, px, py, pz))
 
-                # TODO: Add perceptions for force, vision and hear
+                # TODO: Add perceptions for force and hear
 
                 else:
                     # sensor not supported...
                     pass
+
+            # ideal camera sensor-pipeline
+            if gen_vision:
+                # fetch camera sensor site
+                camera_site = mj_data.site(agent_id.prefix + 'camera')
+
+                if camera_site is not None:
+                    # fetch pose of camera site of robot model
+                    camera_pos = camera_site.xpos.astype(np.float64)
+                    camera_rot = camera_site.xmat.astype(np.float64).reshape((3, 3))
+
+                    # transform detectable obj positions to camera frame
+                    local_obj_pos = np.matmul(camera_rot.T, obj_pos - camera_pos[:, np.newaxis])
+
+                    # transform local positions into polar coordinates
+                    anzimuths = trunc2_vec(np.degrees(np.atan2(local_obj_pos[1], local_obj_pos[0])))
+                    distances = trunc2_vec(np.linalg.norm(local_obj_pos, axis=0))
+                    elevations = trunc2_vec(np.degrees(np.asin(local_obj_pos[2] / distances)))
+
+                    # TODO: Apply sensor noise
+
+                    # check object coordinates for horizontal and vertical view range
+                    half_horizontal_range = 60
+                    half_vertical_range = 60
+                    obj_visibility = (anzimuths >= -half_horizontal_range) & (anzimuths <= half_horizontal_range) & (elevations >= -half_vertical_range) & (elevations <= half_vertical_range)
+
+                    # extract simple world object detections
+                    obj_detections: list[PObjectDetection] = [ObjectDetection(obj_markers[i][1], anzimuths[i], elevations[i], distances[i]) for i in range(n_world_markers) if obj_visibility[i]]
+
+                    # extract agent object detections
+                    idx = n_world_markers
+                    for agent in active_clients:
+                        n_agent_markers = len(agent.get_model_markers())
+                        agent_detections = [ObjectDetection(obj_markers[i][1], anzimuths[i], elevations[i], distances[i]) for i in range(idx, idx + n_agent_markers) if obj_visibility[i]]
+                        if agent_detections:
+                            obj_detections.append(AgentDetection('P', agent.get_team_name(), agent.get_player_no(), agent_detections))
+
+                        idx += n_agent_markers
+
+                    client.add_perception(VisionPerception('See', obj_detections))

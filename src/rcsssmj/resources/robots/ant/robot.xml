@@ -12,7 +12,9 @@
 
   <worldbody>
     <body name="torso" pos="0 0 0">
-      <site name="torso_site" pos="0 0 0"/>
+      <site name="torso" pos="0 0 0"/>
+      <site name="torso-vismarker" pos="0 0 0"/>
+      <site name="camera" pos="0.2 0 0.1"/>
       <camera name="track" mode="trackcom" pos="0 -3 0.3" xyaxes="1 0 0 0 0 1"/>
       <geom name="torso_geom" pos="0 0 0" size="0.25" type="sphere"/>
       <joint armature="0" damping="0" limited="false" margin="0.01" name="root" pos="0 0 0" type="free"/>
@@ -75,11 +77,11 @@
   </actuator>
 
   <sensor>
-    <framequat name="torso_quat" objtype="site" objname="torso_site"/><!-- Used for ground-truth perception of robot orientation.-->
-    <framepos name="torso_pos" objtype="site" objname="torso_site"/><!-- Used for ground-truth perception of robot position.-->
+    <framequat name="torso_quat" objtype="site" objname="torso"/><!-- Used for ground-truth perception of robot orientation.-->
+    <framepos name="torso_pos" objtype="site" objname="torso"/><!-- Used for ground-truth perception of robot position.-->
 
-    <gyro name="torso_gyro" site="torso_site"/>
-    <accelerometer name="torso_acc" site="torso_site"/>
+    <gyro name="torso_gyro" site="torso"/>
+    <accelerometer name="torso_acc" site="torso"/>
     <jointpos name="l4j1" joint="hip_4"/>
     <jointpos name="l4j2" joint="ankle_4"/>
     <jointpos name="l1j1" joint="hip_1"/>

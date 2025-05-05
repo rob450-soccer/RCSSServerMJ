@@ -1,5 +1,6 @@
 import logging
 import socket
+from collections.abc import Sequence
 from enum import Enum
 from queue import Queue
 from threading import Thread
@@ -65,6 +66,7 @@ class SimClient:
 
         self._agent_id: AgentID | None = None
         self._model_spec: Any | None = None
+        self._model_markers: list[tuple[str, str]] = []
 
         self._perceptions: list[Perception] = []
         self._action_queue: Queue[list[SimAction]] = Queue()
@@ -121,6 +123,13 @@ class SimClient:
 
         return self._model_spec
 
+    def get_model_markers(self) -> Sequence[tuple[str, str]]:
+        """
+        Return the list of visual markers of the robot model associated with this client.
+        """
+
+        return self._model_markers
+
     def get_action_queue(self) -> Queue[list[SimAction]]:
         """
         Return the action queue associated with this client.
@@ -138,6 +147,7 @@ class SimClient:
         if self._state == SimClientState.READY:
             self._agent_id = agent_id
             self._model_spec = spec
+            self._model_markers = [(site.name, ''.join(site.name.split('-')[3:-1])) for site in spec.sites if site.name.endswith('-vismarker')]
 
             # add a dummy action to prevent possible timeout in sync-mode
             self._action_queue.put([])

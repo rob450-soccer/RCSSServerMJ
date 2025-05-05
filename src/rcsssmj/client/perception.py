@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Final
+from collections.abc import Sequence
+from typing import Final, Protocol
 
 
 class Perception(ABC):
@@ -227,3 +228,105 @@ class GameStatePerception(Perception):
         """
 
         return f'(GS (sl {self.score_left}) (sr {self.score_right}) (t {self.play_time}) (pm {self.play_mode}))'
+
+
+class PObjectDetection(Protocol):
+    """
+    Base protocol for all object detections of a vision sensor-pipeline.
+    """
+
+    def to_sexp(self) -> str:
+        """
+        Return an symbolic expression representing this detection.
+        """
+
+
+class ObjectDetection:
+    """
+    Simple class for holding an object detection of a vision sensor-pipeline.
+
+    An object detection consists of a single point relating to the center of the object.
+    """
+
+    def __init__(self, name: str, azimuth: float, inclination: float, distance: float) -> None:
+        """Construct a new object detection.
+
+        Parameter
+        ---------
+        name : str
+            The name of the object / detection.
+
+        azimuth : float
+            The azimuth (horizontal) angle.
+
+        inclination : float
+            The inclination / elevation (vertival) angle.
+
+        azimuth : float
+            The azimuth (horizontal) angle.
+        """
+
+        self.name: Final[str] = name
+        self.azimuth: Final[float] = azimuth
+        self.inclination: Final[float] = inclination
+        self.distance: Final[float] = distance
+
+    def to_sexp(self) -> str:
+        """
+        Return an symbolic expression representing this perception.
+
+        Expression format: (<name> (pol <azimuth> <inclination> <distance>))
+        """
+
+        return f'({self.name} (pol {self.azimuth} {self.inclination} {self.distance}))'
+
+
+class AgentDetection:
+    """
+    Simple class for holding an object detection of a vision sensor-pipeline.
+
+    An agent detection consists of the team name and player number of the agent together with a list of object detections for individual body parts / visual markers of the agent.
+    """
+
+    def __init__(self, name: str, team_name: str, player_no: int, body_detections: Sequence[ObjectDetection]) -> None:
+        """Construct a new object detection."""
+
+        self.name: Final[str] = name
+        self.team_name: Final[str] = team_name
+        self.player_no: Final[int] = player_no
+        self.body_detections: Final[Sequence[ObjectDetection]] = body_detections
+
+    def to_sexp(self) -> str:
+        """
+        Return an symbolic expression representing this perception.
+
+        Expression format: (<name> (team <team-name>) (id <player-no>) [(<marker> (pol <h-angle> <v-angle> <distance>))])
+        """
+
+        return '(' + self.name + ' (team ' + self.team_name + ')(id ' + str(self.player_no) + ')' + ''.join(detection.to_sexp() for detection in self.body_detections) + ')'
+
+
+class VisionPerception(Perception):
+    """
+    An vision sensor-pipeline perception.
+    """
+
+    def __init__(self, name: str, objects: Sequence[PObjectDetection]) -> None:
+        """
+        Construct a new vision sensor-pipeline perception.
+        """
+
+        super().__init__(name)
+
+        self.obj_detections: Final[Sequence[PObjectDetection]] = objects
+
+    def to_sexp(self) -> str:
+        """
+        Return an symbolic expression representing this perception.
+
+        Expression format: (See ...)
+        """
+
+        detections = [d.to_sexp() for d in self.obj_detections]
+
+        return '(' + self.name + ' ' + ''.join(detections) + ')'
