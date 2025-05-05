@@ -378,8 +378,12 @@ class Server:
                 needs_recompile = False
 
             # initialize newly activated players
-            for client in activated_clients:
-                self.referee.spawn_agent(cast(AgentID, client.get_id()), mj_data)
+            if activated_clients:
+                for client in activated_clients:
+                    self.referee.spawn_agent(cast(AgentID, client.get_id()), mj_data)
+
+                # calculate forward kinematics / dynamics of newly added robot models (without progrssing the time)
+                mujoco.mj_forward(mj_model, mj_data)
 
             # generate perceptions
             self._generate_perceptions(active_clients, mj_data)
