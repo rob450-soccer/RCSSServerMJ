@@ -1,6 +1,6 @@
 <mujoco>
   <compiler angle="degree" inertiafromgeom="true"/>
-  <option integrator="RK4" iterations="50" solver="PGS" timestep="0.002"/>
+  <option timestep="0.002"/>
   <asset>
     <texture name="pitch" file="pitch_nologo_l.png" type="2d"/>
     <material name="pitch" reflectance="0.0" texture="pitch" texrepeat="1 1" texuniform="false"/>

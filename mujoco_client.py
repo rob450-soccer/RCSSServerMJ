@@ -44,6 +44,7 @@ class Client:
 
     ROBOT_MOTORS: ClassVar[Mapping[str, tuple[str, ...]]] = {
         'ant': ('l4e1', 'l4e2', 'l1e1', 'l1e2', 'l2e1', 'l2e2', 'l3e1', 'l3e2'),
+        'T1': ('he1', 'he2', 'lae1', 'lae2', 'lae3', 'lae4', 'rae1', 'rae2', 'rae3', 'rae4', 'te1', 'lle1', 'lle2', 'lle3', 'lle4', 'lle5', 'lle6', 'rle1', 'rle2', 'rle3', 'rle4', 'rle5', 'rle6'),
     }
 
     def __init__(self, host: str, port: int, team: str, player_no: int, model_name: str | None = None):
