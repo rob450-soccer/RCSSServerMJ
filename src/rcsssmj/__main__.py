@@ -6,7 +6,7 @@ from types import FrameType
 from rcsssmj.game.field import SoccerFieldVersions, create_soccer_field
 from rcsssmj.game.referee import SoccerReferee
 from rcsssmj.game.rules import SoccerRuleBooks, create_soccer_rule_book
-from rcsssmj.sim_server import Server
+from rcsssmj.sim_server import SimServer
 
 # ---------- LOGGING CONFIG ----------
 # console handler
@@ -60,7 +60,7 @@ def soccer_sim() -> None:
     referee = SoccerReferee(rule_book)
 
     # create server
-    server = Server(referee, args.host, args.cport, args.mport, sync_mode=args.sync, real_time=args.realtime, render=args.render)
+    server = SimServer(referee, args.host, args.cport, args.mport, sync_mode=args.sync, real_time=args.realtime, render=args.render)
 
     # register SIGINT handler
     def signal_handler(sig: int, frame: FrameType | int | signal.Handlers | None) -> None:

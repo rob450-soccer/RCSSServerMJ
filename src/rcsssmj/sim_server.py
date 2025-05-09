@@ -5,29 +5,28 @@ from collections.abc import Sequence
 from math import degrees
 from queue import Empty
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import Any, Final, cast
 
 import mujoco
 import numpy as np
 
 from rcsssmj.agent import AgentID
+from rcsssmj.client.action import SimAction
 from rcsssmj.client.perception import AccelerometerPerception, AgentDetection, GyroPerception, JointPerception, ObjectDetection, OrientationPerception, PObjectDetection, PositionPerception, TimePerception, TouchPerception, VisionPerception
 from rcsssmj.client.sim_client import SimClient, SimClientState
+from rcsssmj.client.tcp_client import TCPSimClient
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.game.referee import SoccerReferee
+from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.monitor_client import MonitorClient
 from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
+from rcsssmj.monitor.sim_monitor import SimMonitor
 from rcsssmj.resources.spec_provider import ModelSpecProvider
-
-if TYPE_CHECKING:
-    from rcsssmj.client.action import SimAction
-    from rcsssmj.monitor.sim_monitor import SimMonitor
-
 
 logger = logging.getLogger(__name__)
 
 
-class Server:
+class SimServer:
     """The simulation server component.
 
     The simulation server is the core server component, responsible for running the central simulation lopp as well as managing client and monitor connections / communication.
@@ -237,7 +236,7 @@ class Server:
             logger.info('New client connection: %s.', addr)
 
             conn = TCPLPMConnection(sock, addr)
-            client = SimClient(conn)
+            client = TCPSimClient(conn)
 
             # TODO: synchronize threads when accessing client list
             self._clients.append(client)
@@ -316,8 +315,6 @@ class Server:
             active_monitors: list[SimMonitor] = []
             monitors_to_remove: list[SimMonitor] = []
 
-            client_actions: list[SimAction] = []
-
             # TODO: synchronize threads when accessing client list
             for client in self._clients:
                 if client.get_state() == SimClientState.READY:
@@ -340,46 +337,22 @@ class Server:
 
             # handle disconnected clients
             for client in disconnected_clients:
-                # check if client has been activated before
-                agent_id = client.get_id()
-                if agent_id is not None:
-                    logger.info('Team %s: Player %d left the game.', client.get_team_name(), client.get_player_no())
-
-                    # remove client model from simulation
-                    spec.detach_body(spec.body(agent_id.prefix + 'torso'))
+                if self._deactivate_client(client, spec):
+                    logger.info('Player %s left the game.', client)
                     needs_recompile = True
-
-                    # remove agent from game
-                    self.referee.handle_withdrawal(agent_id)
 
             # handle ready clients
             for client in ready_clients:
-                # try to load the robot model requested by the client
-                robot_spec = self._spec_provider.load_robot(client.get_model_name())
-                if robot_spec is None:
-                    # failed to load the requested model
+                if self._activate_client(client, spec):
+                    logger.info('Player %s joined the game.', client)
+                    needs_recompile = True
+                    activated_clients.append(client)
+                    active_clients.append(client)
+                else:
+                    # failed to activate client --> shutdown and remove client
+                    logger.info('Failed to activete player %s. Disconnecting again.', client)
                     client.shutdown()
                     clients_to_remove.append(client)
-                    continue
-
-                # request participation in game
-                agent_id = self.referee.request_participation(client, robot_spec)
-                if agent_id is None:
-                    # invalid team side -> shutdown client
-                    client.shutdown()
-                    clients_to_remove.append(client)
-                    continue
-
-                logger.info('Team %s: Player #%2d joined the game %s.', client.get_team_name(), client.get_player_no(), client.get_addr())
-
-                # append robot to world
-                frame = spec.worldbody.add_frame()
-                frame.attach_body(robot_spec.body('torso'), agent_id.prefix, '')
-                needs_recompile = True
-
-                client.activate(agent_id, robot_spec)
-                activated_clients.append(client)
-                active_clients.append(client)
 
             if needs_recompile:
                 mj_model, mj_data = spec.recompile(mj_model, mj_data)
@@ -401,26 +374,12 @@ class Server:
                 time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
                 cycle_start = time.time()
 
-            # collect client actions and send perceptions
-            for client in active_clients:
-                # collect all pending actions
-                action_queue = client.get_action_queue()
-                try:
-                    if self.sync_mode:
-                        # wait for exactly one client action
-                        client_actions += action_queue.get(timeout=10)
-                    else:
-                        # fetch all currently available actions
-                        while action_queue.qsize() > 0:
-                            client_actions += action_queue.get_nowait()
-                except Empty:
-                    if self.sync_mode:
-                        # client took too long to answer -> kill it
-                        logger.info('Team %s: Player %d did not respond for more than 10 seconds. Forcing player shutdown.', client.get_team_name(), client.get_player_no())
-                        client.shutdown()
-                        continue
+            # collect client actions
+            # Note: This has to be done separate to and before sending perceptions to clients to prevent fetching new actions that arrived while still sending perceptions.
+            client_actions = self._collect_actions(active_clients, block=self.sync_mode)
 
-                # send perceptions
+            # send perceptions
+            for client in active_clients:
                 client.send_perceptions()
 
             # apply client actions
@@ -430,15 +389,12 @@ class Server:
             # progress simulation
             mujoco.mj_step(mj_model, mj_data, n_substeps)
 
+            # collect monitor commands
+            monitor_commands = self._collect_commands(active_monitors)
+
             # apply monitor commands
-            for monitor in active_monitors:
-                command_queue = monitor.get_command_queue()
-                try:
-                    while command_queue.qsize() > 0:
-                        command = command_queue.get_nowait()
-                        command.perform(self.referee, mj_data)
-                except Empty:
-                    pass
+            for command in monitor_commands:
+                command.perform(self.referee, mj_data)
 
             # call referee to judge the current simulation state and progress the game state
             self.referee.referee(mj_data)
@@ -465,12 +421,130 @@ class Server:
 
         logger.info('Simulation thread finished.')
 
-    def _generate_perceptions(self, active_clients: list[SimClient], mj_data: Any, world_markers: Sequence[tuple[str, str]] = [], *, gen_vision: bool = False) -> None:
+    def _activate_client(self, client: SimClient, spec: Any) -> bool:
+        """Try to activate the given client.
+
+        Parameter
+        ---------
+        client: SimClient
+            The simulation cleint to activate.
+
+        spec: Any
+            The mujoco simulation world spec.
+        """
+
+        # try to load the robot model requested by the client
+        robot_spec = self._spec_provider.load_robot(client.get_model_name())
+        if robot_spec is None:
+            # failed to load the requested model --> report failure
+            return False
+
+        # request participation in game
+        agent_id = self.referee.request_participation(client, robot_spec)
+        if agent_id is None:
+            # invalid team side -> report failure
+            return False
+
+        # append robot to world
+        frame = spec.worldbody.add_frame()
+        frame.attach_body(robot_spec.body('torso'), agent_id.prefix, '')
+
+        client.activate(agent_id, robot_spec)
+
+        return True
+
+    def _deactivate_client(self, client: SimClient, spec: Any) -> bool:
+        """Deactivate the given client instance.
+
+        Parameter
+        ---------
+        client: SimClient
+            The simulation cleint to activate.
+
+        spec: Any
+            The mujoco simulation world spec.
+        """
+
+        # check if client has been activated before
+        agent_id = client.get_id()
+
+        if agent_id is not None:
+            # remove client model from simulation
+            spec.detach_body(spec.body(agent_id.prefix + 'torso'))
+
+            # remove agent from game
+            self.referee.handle_withdrawal(agent_id)
+
+            return True
+
+        return False
+
+    def _collect_actions(self, active_clients: Sequence[SimClient], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
+        """Collect the actions from all active clients.
+
+        Parameter
+        ---------
+        active_clients: Sequence[SimClient]
+            The list of active clients.
+
+        block: bool, default=False
+            Wait for client actions to arrive.
+
+        timeout: float, default=10
+            The time to wait for client actions to arrive. After this time, the client is considered inactive and will be shutdown.
+            If timeout is a negative number, it will wait forever.
+        """
+
+        client_actions: list[SimAction] = []
+
+        # collect client actions and send perceptions
+        for client in active_clients:
+            # collect all pending actions
+            action_queue = client.get_action_queue()
+            try:
+                if block:
+                    # wait for exactly one client action
+                    client_actions += action_queue.get(timeout=timeout)
+                else:
+                    # fetch all currently available actions
+                    while action_queue.qsize() > 0:
+                        client_actions += action_queue.get_nowait()
+            except Empty:
+                if block:
+                    # client took too long to answer -> kill it
+                    logger.info('Team %s: Player %d did not respond for more than %.3f seconds. Forcing player shutdown.', client.get_team_name(), client.get_player_no(), timeout)
+                    client.shutdown()
+                    continue
+
+        return client_actions
+
+    def _collect_commands(self, active_monitors: Sequence[SimMonitor]) -> list[MonitorCommand]:
+        """Collect the commands from all active monitors.
+
+        Parameter
+        ---------
+        active_monitors: Sequence[SimMonitor]
+            The list of active monitors.
+        """
+
+        monitor_commands: list[MonitorCommand] = []
+
+        for monitor in active_monitors:
+            command_queue = monitor.get_command_queue()
+            try:
+                while command_queue.qsize() > 0:
+                    monitor_commands.append(command_queue.get_nowait())
+            except Empty:
+                pass
+
+        return monitor_commands
+
+    def _generate_perceptions(self, active_clients: Sequence[SimClient], mj_data: Any, world_markers: Sequence[tuple[str, str]] = [], *, gen_vision: bool = False) -> None:
         """Generate perceptions for active clients.
 
         Parameter
         ---------
-        active_clients: list[SimClient]
+        active_clients: Sequence[SimClient]
             The list of clients considered as active in this simulation cycle.
 
         mj_data: mjData
@@ -514,6 +588,7 @@ class Server:
 
         # generate client specific perceptions
         for client in active_clients:
+            client.reset_perceptions()
             client.add_perception(sim_time_perception)
             client.add_perception(game_state_perception)
 
