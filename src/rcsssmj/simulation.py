@@ -2,7 +2,6 @@ import logging
 import socket
 import time
 from collections.abc import Sequence
-from math import degrees
 from queue import Empty
 from threading import Lock, Thread
 from typing import Any, Final, cast
@@ -16,7 +15,7 @@ from rcsssmj.client.perception import (
     AccelerometerPerception,
     AgentDetection,
     GyroPerception,
-    JointPerception,
+    JointStatePerception,
     ObjectDetection,
     OrientationPerception,
     Perception,
@@ -319,6 +318,8 @@ class BaseSimulation:
 
         # generate client specific perceptions
         for client in active_clients:
+            joint_names: list[str] = []
+            joint_axs: list[float] = []
             client_perceptions: list[Perception] = [sim_time_perception, game_state_perception]
 
             model_spec = cast(Any, client.get_model_spec())
@@ -330,7 +331,8 @@ class BaseSimulation:
                 sensor_name = sensor_spec.name[prefix_length:]
 
                 if sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTPOS:
-                    client_perceptions.append(JointPerception(sensor_name, trunc2(degrees(sensor.data[0]))))
+                    joint_names.append(sensor_name)
+                    joint_axs.append(sensor.data[0])
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_GYRO:
                     rvx, rvy, rvz = trunc2_vec(np.degrees(sensor.data[0:3]))
@@ -357,6 +359,10 @@ class BaseSimulation:
                 else:
                     # sensor not supported...
                     pass
+
+            # joint state perception
+            if joint_names:
+                client_perceptions.append(JointStatePerception(joint_names, trunc2_vec(np.degrees(joint_axs))))
 
             # ideal camera sensor-pipeline
             if gen_vision:

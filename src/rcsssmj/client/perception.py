@@ -4,32 +4,38 @@ from typing import Final, Protocol
 
 
 class Perception(ABC):
-    """
-    Base class for perceptions.
-    """
+    """Base class for perceptions."""
 
     def __init__(self, name: str) -> None:
-        """
-        Construct a new perception.
+        """Construct a new perception.
+
+        Parameter
+        ---------
+        name: str
+            The name of the sensor that generated the perception.
         """
 
         self.name: Final[str] = name
+        """The sensor / perceptor name."""
 
     @abstractmethod
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
-        """
+        """Return an symbolic expression representing this perception."""
 
 
 class TimePerception(Perception):
-    """
-    A time perception.
-    """
+    """Time perception."""
 
     def __init__(self, name: str, time: float) -> None:
-        """
-        Construct a new time perception.
+        """Construct a new time perception.
+
+        Parameter
+        ---------
+        name: str
+            The name of the sensor that generated the perception.
+
+        time: float
+            The perceived time.
         """
 
         super().__init__(name)
@@ -37,8 +43,7 @@ class TimePerception(Perception):
         self.time: Final[float] = time
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (time (<name> <time>))
         """
@@ -47,13 +52,24 @@ class TimePerception(Perception):
 
 
 class PositionPerception(Perception):
-    """
-    A position perception.
-    """
+    """Position perception."""
 
     def __init__(self, name: str, x: float, y: float, z: float) -> None:
-        """
-        Construct a new position perception.
+        """Construct a new position perception.
+
+        Parameter
+        ---------
+        name: str
+            The sensor / perceptor name.
+
+        x: float
+            The x-coordinate of the perceived position.
+
+        y: float
+            The y-coordinate of the perceived position.
+
+        z: float
+            The z-coordinate of the perceived position.
         """
 
         super().__init__(name)
@@ -63,8 +79,7 @@ class PositionPerception(Perception):
         self.z: Final[float] = z
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (pos (name <name>) (p <x> <y> <z>))
         """
@@ -73,13 +88,27 @@ class PositionPerception(Perception):
 
 
 class OrientationPerception(Perception):
-    """
-    An orientation perception.
-    """
+    """Orientation perception."""
 
     def __init__(self, name: str, qw: float, qx: float, qy: float, qz: float) -> None:
-        """
-        Construct a new orientation perception.
+        """Construct a new orientation perception.
+
+        Parameter
+        ---------
+        name: str
+            The sensor / perceptor name.
+
+        qw: float
+            The w-coordinate of the orientation quaternion.
+
+        qx: float
+            The x-coordinate of the orientation quaternion.
+
+        qy: float
+            The y-coordinate of the orientation quaternion.
+
+        qz: float
+            The z-coordinate of the orientation quaternion.
         """
 
         super().__init__(name)
@@ -90,8 +119,7 @@ class OrientationPerception(Perception):
         self.qz: Final[float] = qz
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (quat (name <name>) (q <qw> <qx> <qy> <qz>))
         """
@@ -99,38 +127,65 @@ class OrientationPerception(Perception):
         return f'(quat (name {self.name}) (q {self.qw} {self.qx} {self.qy} {self.qz}))'
 
 
-class JointPerception(Perception):
-    """
-    A joint perception.
-    """
+class JointStatePerception(Perception):
+    """Sequence of joint perceptions."""
 
-    def __init__(self, name: str, ax: float) -> None:
+    def __init__(self, joint_names: Sequence[str], axs: Sequence[float]) -> None:
+        """Construct a new joint state perception.
+
+        Parameter
+        ---------
+        joint_names: Sequence[str]
+            The list of joint names.
+
+        axs: Sequence[float]
+            The list of joint angles.
         """
-        Construct a new joint perception.
-        """
 
-        super().__init__(name)
+        super().__init__('JS')
 
-        self.ax: Final[float] = ax
+        self.joint_names: Sequence[str] = joint_names
+        self.joint_axs: Sequence[float] = axs
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
-        Expression format: (HJ (name <name>) (ax <ax>))
+        Expression format: (HJ (name <name>) (ax <ax>))*
         """
 
-        return f'(HJ (name {self.name}) (ax {self.ax}))'
+        return ''.join(f'(HJ (name {name})(ax {ax}))' for name, ax in zip(self.joint_names, self.joint_axs, strict=False))
+
+    def to_sexp2(self) -> str:
+        """Return an symbolic expression representing this perception.
+
+        Expression format: (JS (names <name1> <name2> ...) (axs <ax1> <ax2> ...))
+        """
+
+        names = ' '.join(self.joint_names)
+        axs = ' '.join(str(ax) for ax in self.joint_axs)
+
+        return f'({self.name} (names {names}) (axs {axs}))'
 
 
 class GyroPerception(Perception):
-    """
-    A gyroscope perception.
-    """
+    """Gyroscope perception."""
 
     def __init__(self, name: str, rx: float, ry: float, rz: float) -> None:
-        """
-        Construct a new gyroscope perception.
+        """Construct a new gyroscope perception.
+
+        Parameter
+        ---------
+        name: str
+            The sensor / perceptor name.
+
+        rx: float
+            The rotational velocity around the x axis.
+
+        ry: float
+            The rotational velocity around the y axis.
+
+        rz: float
+            The rotational velocity around the z axis.
         """
 
         super().__init__(name)
@@ -140,8 +195,7 @@ class GyroPerception(Perception):
         self.rz: Final[float] = rz
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (GYR (name <name>) (rt <rx> <ry> <rz>))
         """
@@ -150,13 +204,24 @@ class GyroPerception(Perception):
 
 
 class AccelerometerPerception(Perception):
-    """
-    A accelerometer perception.
-    """
+    """Accelerometer perception."""
 
     def __init__(self, name: str, ax: float, ay: float, az: float) -> None:
-        """
-        Construct a new gyroscope perception.
+        """Construct a new gyroscope perception.
+
+        Parameter
+        ---------
+        name: str
+            The sensor / perceptor name.
+
+        ax: float
+            The acceleration along the x-axis.
+
+        ay: float
+            The acceleration along the y-axis.
+
+        az: float
+            The acceleration along the z-axis.
         """
 
         super().__init__(name)
@@ -166,21 +231,24 @@ class AccelerometerPerception(Perception):
         self.az: Final[float] = az
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
-        """
+        """Return an symbolic expression representing this perception."""
 
         return f'(ACC (name {self.name}) (a {self.ax} {self.ay} {self.az}))'
 
 
 class TouchPerception(Perception):
-    """
-    A touch perception.
-    """
+    """Touch perception."""
 
     def __init__(self, name: str, active: int) -> None:
-        """
-        Construct a new gyroscope perception.
+        """Construct a new gyroscope perception.
+
+        Parameter
+        ---------
+        name: str
+            The sensor / perceptor name.
+
+        active: int
+            Flag if the touch perceptor has active contact.
         """
 
         super().__init__(name)
@@ -188,8 +256,7 @@ class TouchPerception(Perception):
         self.active: Final[int] = active
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (TCH <name> val <active>)
         """
@@ -198,9 +265,7 @@ class TouchPerception(Perception):
 
 
 class GameStatePerception(Perception):
-    """
-    A game state perception.
-    """
+    """Game state perception."""
 
     def __init__(
         self,
@@ -209,8 +274,21 @@ class GameStatePerception(Perception):
         play_time: float,
         play_mode: str,
     ) -> None:
-        """
-        Construct a new game state perception.
+        """Construct a new game state perception.
+
+        Parameter
+        ---------
+        score_left: int
+            The score of the left team.
+
+        score_right: int,
+            The score of the right team.
+
+        play_time: float,
+            The current play time.
+
+        play_mode: str,
+            the current play mode.
         """
 
         super().__init__('GS')
@@ -221,8 +299,7 @@ class GameStatePerception(Perception):
         self.play_mode: Final[str] = play_mode
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (GS (sl <sl>) (sr <sr>) (t <play_time>) (pm <play_mode>))
         """
@@ -231,19 +308,14 @@ class GameStatePerception(Perception):
 
 
 class PObjectDetection(Protocol):
-    """
-    Base protocol for all object detections of a vision sensor-pipeline.
-    """
+    """Base protocol for all object detections of a vision sensor-pipeline."""
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this detection.
-        """
+        """Return an symbolic expression representing this detection."""
 
 
 class ObjectDetection:
-    """
-    Simple class for holding an object detection of a vision sensor-pipeline.
+    """Simple class for holding an object detection of a vision sensor-pipeline.
 
     An object detection consists of a single point relating to the center of the object.
     """
@@ -272,8 +344,7 @@ class ObjectDetection:
         self.distance: Final[float] = distance
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (<name> (pol <azimuth> <inclination> <distance>))
         """
@@ -282,14 +353,28 @@ class ObjectDetection:
 
 
 class AgentDetection:
-    """
-    Simple class for holding an object detection of a vision sensor-pipeline.
+    """Simple class for holding an object detection of a vision sensor-pipeline.
 
     An agent detection consists of the team name and player number of the agent together with a list of object detections for individual body parts / visual markers of the agent.
     """
 
     def __init__(self, name: str, team_name: str, player_no: int, body_detections: Sequence[ObjectDetection]) -> None:
-        """Construct a new object detection."""
+        """Construct a new object detection.
+
+        Parameter
+        ---------
+        name: str
+            The object / detection class.
+
+        team_name: str
+            The name of the team the detected agent belongs to.
+
+        player_no: int
+            The player number of the detected agent.
+
+        body_detections: Sequence[ObjectDetection]
+            The list of individual agent body object detections.
+        """
 
         self.name: Final[str] = name
         self.team_name: Final[str] = team_name
@@ -297,8 +382,7 @@ class AgentDetection:
         self.body_detections: Final[Sequence[ObjectDetection]] = body_detections
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (<name> (team <team-name>) (id <player-no>) [(<marker> (pol <h-angle> <v-angle> <distance>))])
         """
@@ -307,13 +391,18 @@ class AgentDetection:
 
 
 class VisionPerception(Perception):
-    """
-    An vision sensor-pipeline perception.
-    """
+    """Vision sensor-pipeline perception."""
 
     def __init__(self, name: str, objects: Sequence[PObjectDetection]) -> None:
-        """
-        Construct a new vision sensor-pipeline perception.
+        """Construct a new vision sensor-pipeline perception.
+
+        Parameter
+        ---------
+        name: str
+            The sensor / perceptor name.
+
+        objects: Sequence[PObjectDetection]
+            The list of object detections.
         """
 
         super().__init__(name)
@@ -321,8 +410,7 @@ class VisionPerception(Perception):
         self.obj_detections: Final[Sequence[PObjectDetection]] = objects
 
     def to_sexp(self) -> str:
-        """
-        Return an symbolic expression representing this perception.
+        """Return an symbolic expression representing this perception.
 
         Expression format: (See ...)
         """
