@@ -12,7 +12,20 @@ import numpy as np
 
 from rcsssmj.agent import AgentID
 from rcsssmj.client.action import SimAction
-from rcsssmj.client.perception import AccelerometerPerception, AgentDetection, GyroPerception, JointPerception, ObjectDetection, OrientationPerception, PObjectDetection, PositionPerception, TimePerception, TouchPerception, VisionPerception
+from rcsssmj.client.perception import (
+    AccelerometerPerception,
+    AgentDetection,
+    GyroPerception,
+    JointPerception,
+    ObjectDetection,
+    OrientationPerception,
+    Perception,
+    PObjectDetection,
+    PositionPerception,
+    TimePerception,
+    TouchPerception,
+    VisionPerception,
+)
 from rcsssmj.client.sim_client import SimClient, SimClientState, TCPSimClient
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.game.referee import SoccerReferee
@@ -307,9 +320,7 @@ class BaseSimulation:
 
         # generate client specific perceptions
         for client in active_clients:
-            client.reset_perceptions()
-            client.add_perception(sim_time_perception)
-            client.add_perception(game_state_perception)
+            client_perceptions: list[Perception] = [sim_time_perception, game_state_perception]
 
             model_spec = cast(Any, client.get_model_spec())
             agent_id = cast(AgentID, client.get_id())
@@ -320,27 +331,27 @@ class BaseSimulation:
                 sensor_name = sensor_spec.name[prefix_length:]
 
                 if sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTPOS:
-                    client.add_perception(JointPerception(sensor_name, trunc2(degrees(sensor.data[0]))))
+                    client_perceptions.append(JointPerception(sensor_name, trunc2(degrees(sensor.data[0]))))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_GYRO:
                     rvx, rvy, rvz = trunc2_vec(np.degrees(sensor.data[0:3]))
-                    client.add_perception(GyroPerception(sensor_name, rvx, rvy, rvz))
+                    client_perceptions.append(GyroPerception(sensor_name, rvx, rvy, rvz))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
                     ax, ay, az = trunc2_vec(sensor.data[0:3])
-                    client.add_perception(AccelerometerPerception(sensor_name, ax, ay, az))
+                    client_perceptions.append(AccelerometerPerception(sensor_name, ax, ay, az))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_TOUCH:
                     active = int(sensor.data[0])
-                    client.add_perception(TouchPerception(sensor_name, active))
+                    client_perceptions.append(TouchPerception(sensor_name, active))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
                     qw, qx, qy, qz = trunc3_vec(sensor.data[0:4])
-                    client.add_perception(OrientationPerception(sensor_name, qw, qx, qy, qz))
+                    client_perceptions.append(OrientationPerception(sensor_name, qw, qx, qy, qz))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEPOS:
                     px, py, pz = trunc3_vec(sensor.data[0:3])
-                    client.add_perception(PositionPerception(sensor_name, px, py, pz))
+                    client_perceptions.append(PositionPerception(sensor_name, px, py, pz))
 
                 # TODO: Add perceptions for force and hear
 
@@ -386,7 +397,10 @@ class BaseSimulation:
 
                         idx += n_agent_markers
 
-                    client.add_perception(VisionPerception('See', obj_detections))
+                    client_perceptions.append(VisionPerception('See', obj_detections))
+
+            # forward generated perceptions to client instance
+            client.set_perceptions(client_perceptions)
 
 
 class SimServer(BaseSimulation):
@@ -780,13 +794,13 @@ class ManagedSim(BaseSimulation):
 
         return 0 if self.mj_model is None else self.mj_model.opt.timestep * self.n_substeps
 
-    def reset(self, client: SimClient, referee: SoccerReferee) -> None:
+    def reset(self, clients: SimClient | Sequence[SimClient], referee: SoccerReferee) -> None:
         """Reset the simulation for the given client and referee.
 
         Parameter
         ---------
-        client: SimClient
-            The (learning) client instance.
+        clients: SimClient | Sequence[SimClient]
+            The (learning) client instance and possibly further clients executed synchronously with the simulation.
 
         referee: SoccerReferee
             The referee to use for judging the game.
@@ -798,7 +812,7 @@ class ManagedSim(BaseSimulation):
 
         # reset simulation state
         self._referee = referee
-        self._clients = [client]
+        self._clients = clients if isinstance(clients, Sequence) else [clients]
         self._client_actions = []
 
         # load a new world
@@ -848,6 +862,10 @@ class ManagedSim(BaseSimulation):
 
         if self._referee is None or self._mj_data is None:
             raise RuntimeError
+
+        # send perceptions
+        for client in self._clients:
+            client.send_perceptions()
 
         # progress simulation
         self._step(self._client_actions, commands, self._referee)

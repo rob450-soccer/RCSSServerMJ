@@ -61,10 +61,10 @@ class SimClient(ABC):
 
         self._agent_id: AgentID | None = None
         self._model_spec: Any | None = None
-        self._model_markers: list[tuple[str, str]] = []
+        self._model_markers: Sequence[tuple[str, str]] = []
 
-        self._perceptions: list[Perception] = []
-        self._action_queue: Queue[list[SimAction]] = Queue()
+        self._perceptions: Sequence[Perception] = []
+        self._action_queue: Queue[Sequence[SimAction]] = Queue()
 
     def get_state(self) -> SimClientState:
         """
@@ -115,7 +115,7 @@ class SimClient(ABC):
 
         return self._model_markers
 
-    def get_action_queue(self) -> Queue[list[SimAction]]:
+    def get_action_queue(self) -> Queue[Sequence[SimAction]]:
         """
         Return the action queue associated with this client.
         """
@@ -146,24 +146,20 @@ class SimClient(ABC):
 
         self._state = SimClientState.DISCONNECTED
 
-    def reset_perceptions(self) -> None:
+    def set_perceptions(self, perceptions: Sequence[Perception]) -> None:
         """
-        Reset the perception list.
+        Set the perceptions of the agent for this simulation cycle.
 
         This method is called by the main simulation loop.
-        """
 
-        self._perceptions = []
-
-    def add_perception(self, perception: Perception) -> None:
-        """
-        Add the given perception to the agent perceptions for this simulation cycle.
-
-        This method is called by the main simulation loop.
+        Parameter
+        ---------
+        perceptions: Sequence[Perception]
+            The list of perceptions of the agent for this simulation cycle.
         """
 
         # buffer perception
-        self._perceptions.append(perception)
+        self._perceptions = perceptions
 
     @abstractmethod
     def send_perceptions(self) -> None:
@@ -321,12 +317,12 @@ class ManagedSimClient(SimClient):
 
         return self._perceptions
 
-    def put_action(self, actions: list[SimAction]) -> None:
+    def put_action(self, actions: Sequence[SimAction]) -> None:
         """Put the given actions to the action queue.
 
         Parameter
         ---------
-        actions: list[SimAction]
+        actions: Sequence[SimAction]
             The list of actions.
         """
 
