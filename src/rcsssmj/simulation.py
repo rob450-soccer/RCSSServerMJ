@@ -783,10 +783,10 @@ class ManagedSim(BaseSimulation):
         self._referee: SoccerReferee | None = None
         """The game referee."""
 
-        self._clients: list[SimClient] = []
+        self._clients: Sequence[SimClient] = []
         """The list of active clients."""
 
-        self._client_actions: list[SimAction] = []
+        self._client_actions: Sequence[SimAction] = []
         """The list of buffered client actions for the next simulation cycle."""
 
     def get_client_timestep(self) -> float:
