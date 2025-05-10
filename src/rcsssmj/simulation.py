@@ -30,9 +30,8 @@ from rcsssmj.client.sim_client import SimClient, SimClientState, TCPSimClient
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.game.referee import SoccerReferee
 from rcsssmj.monitor.commands import MonitorCommand
-from rcsssmj.monitor.monitor_client import MonitorClient
 from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
-from rcsssmj.monitor.sim_monitor import SimMonitor
+from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState, TCPSimMonitor
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
 logger = logging.getLogger(__name__)
@@ -567,13 +566,13 @@ class SimServer(BaseSimulation):
 
         # shutdown active clients
         for client in self._clients:
-            client.shutdown(no_wait=False)
+            client.shutdown(wait=True)
         self._clients.clear()
         logger.info('Disconnected clients.')
 
         # shutdown active monitors
         for monitor in self._monitors:
-            monitor.shutdown(no_wait=False)
+            monitor.shutdown(wait=True)
         self._monitors.clear()
         logger.info('Disconnected monitors.')
 
@@ -640,7 +639,7 @@ class SimServer(BaseSimulation):
             logger.info('New monitor connection: %s.', addr)
 
             conn = TCPLPMConnection(sock, addr)
-            monitor = MonitorClient(conn)
+            monitor = TCPSimMonitor(conn)
 
             with self._mutex:
                 self._monitors.append(monitor)
@@ -694,7 +693,7 @@ class SimServer(BaseSimulation):
                         pass
 
                 for monitor in self._monitors:
-                    if monitor.is_active():
+                    if monitor.get_state() == SimMonitorState.CONNECTED:
                         active_monitors.append(monitor)
                     else:
                         monitors_to_remove.append(monitor)
@@ -754,7 +753,7 @@ class SimServer(BaseSimulation):
 
             # update connected monitors
             for monitor in active_monitors:
-                monitor.update(self._mj_model, self._mj_data)
+                monitor.update(self._mj_model, self._mj_data, self._frame_id)
 
             # TODO: log monitor message to simulator log
             # TODO: log client perceptions and actions to client logs

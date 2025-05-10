@@ -1,28 +1,32 @@
 import time
 from itertools import cycle
-from queue import Queue
 from typing import Any
 
 import glfw
 import mujoco
 
-from rcsssmj.monitor.commands import DropBallCommand, KickOffCommand, MonitorCommand
-from rcsssmj.monitor.sim_monitor import SimMonitor
+from rcsssmj.monitor.commands import DropBallCommand, KickOffCommand
+from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState
 
 
 class MujocoMonitor(SimMonitor):
-    """
-    Internal monitor component.
-    """
+    """Internal monitor component."""
 
     def __init__(self, model: Any, render_interval: int) -> None:
-        """
-        Construct a new internal monitor viewer.
+        """Construct a new internal monitor viewer.
+
+        Parameter
+        ---------
+        model: MjModel
+            The simulation model.
+
+        render_interval: int
+            The interval (in cycles) in which to render the state of the simulation. Set to 1 to render each cycle.
         """
 
+        super().__init__(render_interval)
+
         self.model = model
-        self.render_interval: int = render_interval
-        self.render_ttl: int = 0
         self.fps: float = 0.0
 
         self.button_left: bool = False
@@ -33,7 +37,6 @@ class MujocoMonitor(SimMonitor):
         self.frames: int = 0
         self.last_render_time: float = time.time()
 
-        self.command_queue: Queue[MonitorCommand] = Queue()
         self.hide_menu: bool = False
         self.font_scale = 100
 
@@ -66,39 +69,13 @@ class MujocoMonitor(SimMonitor):
         self.viewport = mujoco.MjrRect(0, 0, framebuffer_width, framebuffer_height)
         self.context = mujoco.MjrContext(model, mujoco.mjtFontScale(self.font_scale))
 
-        self._shutdown: bool = False
-
-    def is_active(self) -> bool:
-        """
-        Check if the monitor is still active.
-        """
-
-        return not self._shutdown
-
-    def get_command_queue(self) -> Queue[MonitorCommand]:
-        """
-        Return the command queue associated with this client.
-        """
-
-        return self.command_queue
-
-    def shutdown(self, *, no_wait: bool = True) -> None:
-        """
-        Stop the monitor.
-        """
-
-        del no_wait  # signal unused parameter
-
-        self._shutdown = True
+    def shutdown(self, *, wait: bool = False) -> None:
+        super().shutdown(wait=wait)
 
         glfw.set_window_should_close(self.window, True)
         glfw.destroy_window(self.window)
 
-    def update(self, mj_model: Any, mj_data: Any) -> None:
-        """
-        Update the monitor state.
-        """
-
+    def update(self, mj_model: Any, mj_data: Any, frame_id: int) -> None:
         if self.model is not mj_model:
             self.model = mj_model
 
@@ -106,12 +83,11 @@ class MujocoMonitor(SimMonitor):
             self.scene = mujoco.MjvScene(self.model, 1000)
             self.context = mujoco.MjrContext(self.model, mujoco.mjtFontScale(self.font_scale))
 
-        self.render(mj_data)
+        if self.update_interval <= 1 or frame_id % self.update_interval == 0:
+            self.render(mj_data)
 
     def mouse_button(self, window: Any, button: Any, act: Any, mods: Any) -> None:
-        """
-        Update mouse button state.
-        """
+        """Update mouse button state."""
 
         self.button_left = glfw.get_mouse_button(self.window, glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS
         self.button_right = glfw.get_mouse_button(self.window, glfw.MOUSE_BUTTON_RIGHT) == glfw.PRESS
@@ -120,9 +96,7 @@ class MujocoMonitor(SimMonitor):
         self.last_x, self.last_y = glfw.get_cursor_pos(self.window)
 
     def mouse_move(self, window: Any, x_pos: int, y_pos: int) -> None:
-        """
-        Handle mouse movement.
-        """
+        """Handle mouse movement."""
 
         if not self.button_left and not self.button_right and not self.button_middle:
             return
@@ -145,9 +119,7 @@ class MujocoMonitor(SimMonitor):
         mujoco.mjv_moveCamera(self.model, action, dx / width, dy / height, self.scene, self.camera)
 
     def keyboard(self, window: Any, key: int, scancode: Any, act: int, mods: Any) -> None:
-        """
-        Handle keyboard inputs.
-        """
+        """Handle keyboard inputs."""
 
         if act != glfw.RELEASE:
             return
@@ -157,65 +129,52 @@ class MujocoMonitor(SimMonitor):
         elif key == glfw.KEY_TAB:
             self.camera_mode_target = next(self.camera_mode_iter)
         elif key == glfw.KEY_K:
-            self.command_queue.put(KickOffCommand(0))
+            self._command_queue.put(KickOffCommand(0))
         elif key == glfw.KEY_J:
-            self.command_queue.put(KickOffCommand(1))
+            self._command_queue.put(KickOffCommand(1))
         elif key == glfw.KEY_B:
-            self.command_queue.put(DropBallCommand())
+            self._command_queue.put(DropBallCommand())
 
     def scroll(self, window: Any, x_offset: Any, y_offset: Any) -> None:
-        """
-        Handle scroll input.
-        """
+        """Handle scroll input."""
 
         mujoco.mjv_moveCamera(self.model, mujoco.mjtMouse.mjMOUSE_ZOOM, 0, 0.05 * y_offset, self.scene, self.camera)
 
     def render(self, data: Any) -> None:
-        """
-        Render function.
-        """
+        """Render function."""
 
-        if self._shutdown:
+        if self._state == SimMonitorState.DISCONNECTED:
             # prevent rendering after shutdown
             return
 
-        # decrement render ttl
-        self.render_ttl -= 1
+        # calculate fps
+        current_time = time.time()
+        fps = 1 / (current_time - self.last_render_time)
+        self.last_render_time = current_time
+        self.fps = (self.fps * 10 + fps) / 11
 
-        if self.render_ttl <= 0:
-            # reset render ttl
-            self.render_ttl = self.render_interval
+        # render scene
+        mujoco.mjv_updateScene(self.model, data, self.scene_option, None, self.camera, mujoco.mjtCatBit.mjCAT_ALL, self.scene)
+        self.viewport.width, self.viewport.height = glfw.get_framebuffer_size(self.window)
+        mujoco.mjr_render(self.viewport, self.scene, self.context)
 
-            # calculate fps
-            current_time = time.time()
-            fps = 1 / (current_time - self.last_render_time)
-            self.last_render_time = current_time
-            self.fps = (self.fps * 10 + fps) / 11
+        # render overlays
+        if not self.hide_menu:
+            overlays = self.create_overlays()
+            for gridpos, [t1, t2] in overlays.items():
+                mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_SHADOW, gridpos, self.viewport, t1, t2, self.context)
 
-            # render scene
-            mujoco.mjv_updateScene(self.model, data, self.scene_option, None, self.camera, mujoco.mjtCatBit.mjCAT_ALL, self.scene)
-            self.viewport.width, self.viewport.height = glfw.get_framebuffer_size(self.window)
-            mujoco.mjr_render(self.viewport, self.scene, self.context)
+        glfw.swap_buffers(self.window)
+        glfw.poll_events()
 
-            # render overlays
-            if not self.hide_menu:
-                overlays = self.create_overlays()
-                for gridpos, [t1, t2] in overlays.items():
-                    mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_SHADOW, gridpos, self.viewport, t1, t2, self.context)
+        self.frames += 1
+        self.set_camera()
 
-            glfw.swap_buffers(self.window)
-            glfw.poll_events()
-
-            self.frames += 1
-            self.set_camera()
-
-            if glfw.window_should_close(self.window):
-                self.shutdown()
+        if glfw.window_should_close(self.window):
+            self.shutdown()
 
     def create_overlays(self) -> dict[Any, list[str]]:
-        """
-        Create overlays dictionary.
-        """
+        """Create overlays dictionary."""
 
         overlays: dict[Any, list[str]] = {}
 
@@ -240,9 +199,7 @@ class MujocoMonitor(SimMonitor):
         return overlays
 
     def set_camera(self) -> None:
-        """
-        Set the active camera mode.
-        """
+        """Set the active camera mode."""
 
         if self.camera_mode_target == 'static' and self.camera_mode != 'static':
             self.camera.fixedcamid = 0
