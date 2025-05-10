@@ -6,7 +6,7 @@ from types import FrameType
 from rcsssmj.game.field import SoccerFieldVersions, create_soccer_field
 from rcsssmj.game.referee import SoccerReferee
 from rcsssmj.game.rules import SoccerRuleBooks, create_soccer_rule_book
-from rcsssmj.sim_server import SimServer
+from rcsssmj.simulation import SimServer
 
 # ---------- LOGGING CONFIG ----------
 # console handler
