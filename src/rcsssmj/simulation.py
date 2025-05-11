@@ -175,6 +175,26 @@ class BaseSimulation:
             # remove client model from simulation
             self._mj_spec.detach_body(self._mj_spec.body(agent_id.prefix + 'torso'))
 
+            # delete various components manually, as they are not automatically removed again when the root body is detached
+            # Note:
+            # Not sure if this is intentional behavior or a bug in mujoco.
+            # It's also not clear what components need to be deleted separately.
+            # The code below so far prevents any follow-up exceptions when re-attaching the same model again.
+            # But at the moment, there is no guarantee that there will be no components left in the spec that may cause some trouble at some point.
+            def del_els(el_list: list[Any]) -> None:
+                for el in el_list:
+                    el.delete()
+
+            model_spec = cast(Any, client.get_model_spec())
+            # del_els(model_spec.cameras)
+            # del_els(model_spec.geoms)
+            # del_els(model_spec.lights)
+            del_els(model_spec.materials)
+            del_els(model_spec.meshes)
+            del_els(model_spec.sites)
+            del_els(model_spec.texts)
+            del_els(model_spec.textures)
+
             # remove agent from game
             referee.handle_withdrawal(agent_id)
 
