@@ -85,7 +85,7 @@ class SoccerField:
     """The dimensions of the penalty area (if existing)."""
 
     goalie_area_dim: tuple[float, float] = (16.5, 7.32 + 2 * 16.5)  # official size
-    """The dimensions of the goalie area (if existing)."""
+    """The dimensions of the goalie area."""
 
     corner_area_radius: float = 1  # official radius
     """The radius of the corner area."""

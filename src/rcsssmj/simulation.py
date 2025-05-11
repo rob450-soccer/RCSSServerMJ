@@ -105,14 +105,14 @@ class BaseSimulation:
 
         return self._mj_data
 
-    def _load_world(self) -> None:
-        """Load the simulation world."""
+    def _create_world(self, referee: SoccerReferee) -> bool:
+        """(Re-)initialize the game and create a new simulation world environment."""
 
-        # load soccer pitch spec
-        self._mj_spec = self._spec_provider.load_environment('soccer')
+        # initialize game and create game world environment
+        self._mj_spec = referee.init_game(self._spec_provider)
         if self._mj_spec is None:
-            msg = 'Failed to load environment "soccer"'
-            raise RuntimeError(msg)
+            logger.warning('Failed to initialize game.')
+            return False
 
         # prepare initial simulation model and data
         self._mj_model = self._mj_spec.compile()
@@ -123,6 +123,8 @@ class BaseSimulation:
 
         # reset frame id
         self._frame_id = 0
+
+        return True
 
     def _activate_client(self, client: SimClient, referee: SoccerReferee) -> bool:
         """Try to activate the given client.
@@ -682,8 +684,9 @@ class SimServer(BaseSimulation):
 
         logger.info('Starting Simulation loop.')
 
-        # load simulation world
-        self._load_world()
+        # create simulation world
+        if not self._create_world(self.referee):
+            return
 
         # create internal monitor
         if self.render:
@@ -841,8 +844,9 @@ class ManagedSim(BaseSimulation):
         self._clients = clients if isinstance(clients, Sequence) else [clients]
         self._client_actions = []
 
-        # load a new world
-        self._load_world()
+        # create a new world
+        if not self._create_world(self._referee):
+            raise RuntimeError
 
         # activate clients
         for client in self._clients:
