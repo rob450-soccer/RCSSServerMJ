@@ -132,8 +132,8 @@ class BaseSimulation:
         client: SimClient
             The simulation cleint to activate.
 
-        spec: Any
-            The mujoco simulation world spec.
+        referee: SoccerReferee
+            The referee instance.
         """
 
         # try to load the robot model requested by the client
@@ -164,8 +164,8 @@ class BaseSimulation:
         client: SimClient
             The simulation cleint to activate.
 
-        spec: Any
-            The mujoco simulation world spec.
+        referee: SoccerReferee
+            The referee instance.
         """
 
         # check if client has been activated before
@@ -276,8 +276,8 @@ class BaseSimulation:
         active_clients: Sequence[SimClient]
             The list of clients considered as active in this simulation cycle.
 
-        mj_data: mjData
-            The current simulation state.
+        referee: SoccerReferee
+            The referee instance.
 
         gen_vision: bool, default=False
             Generate vision perception.
@@ -379,8 +379,9 @@ class BaseSimulation:
 
                     # transform local positions into polar coordinates
                     anzimuths = trunc2_vec(np.degrees(np.atan2(local_obj_pos[1], local_obj_pos[0])))
-                    distances = trunc2_vec(np.linalg.norm(local_obj_pos, axis=0))
+                    distances = np.linalg.norm(local_obj_pos, axis=0)
                     elevations = trunc2_vec(np.degrees(np.asin(local_obj_pos[2] / distances)))
+                    distances = trunc2_vec(distances)
 
                     # TODO: Apply sensor noise
 
