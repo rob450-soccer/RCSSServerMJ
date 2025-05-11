@@ -69,11 +69,17 @@ class MujocoMonitor(SimMonitor):
         self.viewport = mujoco.MjrRect(0, 0, framebuffer_width, framebuffer_height)
         self.context = mujoco.MjrContext(model, mujoco.mjtFontScale(self.font_scale))
 
+        # Setting the swap interval to 0 forces the call to glfw.swap_buffers to not block even if the window is currently not visible (minimized or hidden by other windows).
+        # This setting counteracts some energy saving measures performed by some OS, but is required to prevent rendering from blocking the execution of the main simulation loop.
+        glfw.swap_interval(0)
+
     def shutdown(self, *, wait: bool = False) -> None:
         super().shutdown(wait=wait)
 
         glfw.set_window_should_close(self.window, True)
         glfw.destroy_window(self.window)
+        glfw.poll_events()  # make sure there are no pending events, otherwise the window will just freeze and not close properly
+        glfw.terminate()
 
     def update(self, mj_model: Any, mj_data: Any, frame_id: int) -> None:
         if self.model is not mj_model:
