@@ -111,11 +111,6 @@ class Client:
         Main loop of the agent.
         """
 
-        logger.info('Initializing agent...')
-        init_msg = f'(init {self._model_name} {self._team} {self._player_no})'
-        self._send_message(init_msg.encode())
-        # logger.info('Initialization complete.')
-
         self.nr_joints = len(self.ROBOT_MOTORS[self._model_name])
         self.previous_action = np.zeros(self.nr_joints)
         self.p_gain = 25.0
@@ -129,7 +124,7 @@ class Client:
             -0.4, 0.0, 0.0, 0.8, -0.4, 0.0,
             0.4, 0.0, 0.0, -0.8, 0.4, 0.0,
         ])
-        train_sim_flip = np.array([
+        self.train_sim_flip = np.array([
             1.0, -1.0,
             1.0, -1.0, -1.0, 1.0,
             -1.0, -1.0, 1.0, 1.0,
@@ -141,12 +136,16 @@ class Client:
         self.policy = PolicyNetwork().to(self.device)
         self.policy.load_state_dict(torch.load("locomotion_nn.pth", map_location=self.device))
 
+        # Connect to the server
+        logger.info('Initializing agent...')
+        init_msg = f'(init {self._model_name} {self._team} {self._player_no})'
+        self._send_message(init_msg.encode())
+
         wait_until_walking = 50
 
         logger.info('Running perception-action-loop.')
         while True:
             try:
-                # receive perception message
                 perception_msg = self._receive_message()
                 perception_msg_str = perception_msg.decode()
                 perception_data = self.parse_sensor_string(perception_msg_str)
@@ -158,8 +157,8 @@ class Client:
                 joint_vel = np.deg2rad(joint_vel_degrees)
 
                 qpos_qvel_previous_action = np.vstack(([
-                    ((joint_pos * train_sim_flip) - self.joint_nominal_position) / 4.6,
-                    joint_vel / 110.0 * train_sim_flip,
+                    ((joint_pos * self.train_sim_flip) - self.joint_nominal_position) / 4.6,
+                    joint_vel / 110.0 * self.train_sim_flip,
                     self.previous_action / 10.0,
                 ])).T.flatten()
                 
@@ -190,20 +189,20 @@ class Client:
                 nn_action = self.policy(torch.tensor(observation, dtype=torch.float32).to(self.device)).detach().cpu().numpy()
 
                 target_joint_positions = self.joint_nominal_position + self.scaling_factor * nn_action
-                target_joint_positions *= train_sim_flip
+                target_joint_positions *= self.train_sim_flip
 
                 msg_list: list[str] = []
-                motors = self.ROBOT_MOTORS[self._model_name]
-                for motor, target_joint_position in zip(motors, target_joint_positions, strict=False):
-                    msg_list.append(f'({motor} {target_joint_position:.2f} 0.0 {self.p_gain:.2f} {self.d_gain:.2f} 0.0)')
 
                 if not self._has_beamed:
-                    # msg_list.append('(beam ' + ' '.join([str(val) for val in self.BEAM_POSES[self.player_id]]) + ')')
                     beam_pose = self.BEAM_POSES[self._player_no]
                     msg_list.append(f'(beam {beam_pose[0]} {beam_pose[1]} {beam_pose[2]})')
                     self._has_beamed = True
+                else:
+                    motors = self.ROBOT_MOTORS[self._model_name]
+                    for motor, target_joint_position in zip(motors, target_joint_positions, strict=False):
+                        msg_list.append(f'({motor} {target_joint_position:.2f} 0.0 {self.p_gain:.2f} {self.d_gain:.2f} 0.0)')
 
-                self.previous_action = nn_action
+                    self.previous_action = nn_action
 
                 # send action message
                 action_msg = ''.join(msg_list)
