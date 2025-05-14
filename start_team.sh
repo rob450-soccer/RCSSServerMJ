@@ -10,6 +10,6 @@ ROBOT_MODEL="${2:-ant}"
 
 for ((i=1; i<=11; i++))
 do
-    python mujoco_client.py -s localhost -p 60000 -t $TEAM -n $i -r $ROBOT_MODEL &
+    python nn_client.py -s localhost -p 60000 -t $TEAM -n $i -r $ROBOT_MODEL &
     # sleep 0.3
 done

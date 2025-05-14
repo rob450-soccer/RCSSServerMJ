@@ -231,7 +231,7 @@ class SoccerReferee:
         field_border = self.rules.field.field_border
 
         x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
-        pos = (x_sign * (2 * agent_id.player_no + 1), field_half_y + field_border, 1.2)
+        pos = (x_sign * (2 * agent_id.player_no + 1), field_half_y + field_border, 0.6745)
         quat = (1, 0, 0, 0)
 
         logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], pos[2])
