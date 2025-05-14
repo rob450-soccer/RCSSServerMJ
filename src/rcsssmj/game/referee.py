@@ -3,12 +3,14 @@ import logging
 from math import degrees, pi
 from typing import Any, Final
 
+from scipy.spatial.transform import Rotation as R
+
 from rcsssmj.agent import AgentID, PAgent
 from rcsssmj.client.perception import GameStatePerception, Perception
 from rcsssmj.game.game_state import GameState
 from rcsssmj.game.rules import SoccerRules
 from rcsssmj.game.soccer import TeamSide
-from rcsssmj.mjutils import place_robot_2d, place_robot_3d
+from rcsssmj.mjutils import place_robot_3d
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
 logger = logging.getLogger(__name__)
@@ -210,7 +212,7 @@ class SoccerReferee:
 
         return agent_id
 
-    def spawn_agent(self, agent_id: AgentID, mj_data: Any) -> None:
+    def spawn_agent(self, agent_id: AgentID, mj_model: Any, mj_data: Any) -> None:
         """Place the given agent at a save (collision free) initial location.
 
         Parameter
@@ -236,7 +238,7 @@ class SoccerReferee:
 
         logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], pos[2])
 
-        place_robot_3d(agent_id.prefix, mj_data, pos, quat)
+        place_robot_3d(agent_id.prefix, mj_model, mj_data, pos, quat)
 
     def handle_withdrawal(self, aid: AgentID) -> None:
         """Handle the withdrawal of an agent participating in the game.
@@ -267,7 +269,7 @@ class SoccerReferee:
             play_mode=self._state.get_play_mode().value,
         )
 
-    def beam_agent(self, actuator_name: str, mj_data: Any, beam_pose: tuple[float, float, float]) -> None:
+    def beam_agent(self, actuator_name: str, mj_model: Any, mj_data: Any, beam_pose: tuple[float, float, float]) -> None:
         """Perform a beam action for the agent posing the given effector.
 
         Parameter
@@ -280,6 +282,7 @@ class SoccerReferee:
 
         beam_pose: tuple[float, float, float]
             The desired 2D beam pose (x, y, theta).
+            Theta is given in radians.
         """
 
         agent_id = AgentID.from_prefixed_name(actuator_name)
@@ -294,7 +297,11 @@ class SoccerReferee:
 
         logger.debug('Beam Team #%d Player #%02d to (%.3f, %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pose[0], pose[1], degrees(pose[2]))
 
-        place_robot_2d(agent_id.prefix, mj_data, pose)
+        pos = (pose[0], pose[1], 0.6745)
+        orientation_quat = R.from_euler('xyz', [0, 0, pose[2]]).as_quat()
+        mujoco_quat = [orientation_quat[3], orientation_quat[0], orientation_quat[1], orientation_quat[2]]
+
+        place_robot_3d(agent_id.prefix, mj_model, mj_data, pos, mujoco_quat)
 
     def referee(self, mj_data: Any) -> None:
         """Referee the current simulation state.

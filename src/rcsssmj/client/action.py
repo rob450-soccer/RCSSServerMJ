@@ -129,7 +129,7 @@ class BeamAction(SimAction):
         self.target_pose: Final[tuple[float, float, float]] = target_pose
 
     def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
-        referee.beam_agent(self.actuator_name, mj_data, self.target_pose)
+        referee.beam_agent(self.actuator_name, mj_model, mj_data, self.target_pose)
 
 
 class SayAction(SimAction):

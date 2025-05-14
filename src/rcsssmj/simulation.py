@@ -215,7 +215,7 @@ class BaseSimulation:
         block: bool, default=False
             Wait for client actions to arrive.
 
-        timeout: float, default=10
+        timeout: float, default=5
             The time to wait for client actions to arrive. After this time, the client is considered inactive and will be shutdown.
             If timeout is a negative number, it will wait forever.
         """
@@ -758,7 +758,7 @@ class SimServer(BaseSimulation):
             # initialize newly activated players
             if activated_clients:
                 for client in activated_clients:
-                    self.referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_data)
+                    self.referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_model, self._mj_data)
 
                 # calculate forward kinematics / dynamics of newly added robot models (without progrssing the time)
                 mujoco.mj_forward(self._mj_model, self._mj_data)
@@ -862,7 +862,7 @@ class ManagedSim(BaseSimulation):
 
         # spawn agents
         for client in self._clients:
-            self._referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_data)
+            self._referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_model, self._mj_data)
 
         # initialize sim data and client perceptions
         self.forward()
