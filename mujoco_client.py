@@ -125,7 +125,7 @@ class Client:
 
                 msg_list: list[str] = []
                 for motor, action in zip(motors, actions, strict=False):
-                    msg_list.append(f'({motor} {action:.2f})')
+                    msg_list.append(f'({motor} 0.0 0.0 0.0 0.0 {action:.2f})')
 
                 if not self._has_beamed:
                     # msg_list.append('(beam ' + ' '.join([str(val) for val in self.BEAM_POSES[self.player_id]]) + ')')

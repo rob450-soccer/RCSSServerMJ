@@ -275,7 +275,7 @@ class BaseSimulation:
 
         # apply client actions
         for action in client_actions:
-            action.perform(referee, self._mj_data)
+            action.perform(referee, self._mj_model, self._mj_data)
 
         # progress simulation
         mujoco.mj_step(self._mj_model, self._mj_data, self.n_substeps)

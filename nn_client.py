@@ -191,12 +191,11 @@ class Client:
 
                 target_joint_positions = self.joint_nominal_position + self.scaling_factor * nn_action
                 target_joint_positions *= train_sim_flip
-                torques = self.p_gain * (target_joint_positions - joint_pos) - self.d_gain * joint_vel
 
                 msg_list: list[str] = []
                 motors = self.ROBOT_MOTORS[self._model_name]
-                for motor, torque in zip(motors, torques, strict=False):
-                    msg_list.append(f'({motor} {torque:.2f})')
+                for motor, target_joint_position in zip(motors, target_joint_positions, strict=False):
+                    msg_list.append(f'({motor} {target_joint_position:.2f} 0.0 {self.p_gain:.2f} {self.d_gain:.2f} 0.0)')
 
                 if not self._has_beamed:
                     # msg_list.append('(beam ' + ' '.join([str(val) for val in self.BEAM_POSES[self.player_id]]) + ')')

@@ -82,9 +82,16 @@ class SExprActionParser(ActionParser):
                     # sync action: (syn)
                     pass
 
-                elif n_elements == 2:
-                    # joint action: (<name> <velocity>)
-                    actions.append(MotorAction(model_prefix + child.get_str(0), child.get_float(1)))
+                elif n_elements == 6:
+                    # joint action: (<name> <q> <dq> <kp> <kd> <tau>)
+                    actions.append(MotorAction(
+                        model_prefix + child.get_str(0),
+                        child.get_float(1),
+                        child.get_float(2),
+                        child.get_float(3),
+                        child.get_float(4),
+                        child.get_float(5)
+                    ))
 
         except Exception:  # noqa: BLE001
             # error while parsing
