@@ -82,13 +82,21 @@
 
     <gyro name="torso_gyro" site="torso"/>
     <accelerometer name="torso_acc" site="torso"/>
-    <jointpos name="l4j1" joint="hip_4"/>
-    <jointpos name="l4j2" joint="ankle_4"/>
-    <jointpos name="l1j1" joint="hip_1"/>
-    <jointpos name="l1j2" joint="ankle_1"/>
-    <jointpos name="l2j1" joint="hip_2"/>
-    <jointpos name="l2j2" joint="ankle_2"/>
-    <jointpos name="l3j1" joint="hip_3"/>
-    <jointpos name="l3j2" joint="ankle_3"/>
+    <jointpos name="q_l4j1" joint="hip_4"/>
+    <jointpos name="q_l4j2" joint="ankle_4"/>
+    <jointpos name="q_l1j1" joint="hip_1"/>
+    <jointpos name="q_l1j2" joint="ankle_1"/>
+    <jointpos name="q_l2j1" joint="hip_2"/>
+    <jointpos name="q_l2j2" joint="ankle_2"/>
+    <jointpos name="q_l3j1" joint="hip_3"/>
+    <jointpos name="q_l3j2" joint="ankle_3"/>
+    <jointvel name="dq_l4j1" joint="hip_4"/>
+    <jointvel name="dq_l4j2" joint="ankle_4"/>
+    <jointvel name="dq_l1j1" joint="hip_1"/>
+    <jointvel name="dq_l1j2" joint="ankle_1"/>
+    <jointvel name="dq_l2j1" joint="hip_2"/>
+    <jointvel name="dq_l2j2" joint="ankle_2"/>
+    <jointvel name="dq_l3j1" joint="hip_3"/>
+    <jointvel name="dq_l3j2" joint="ankle_3"/>
   </sensor>
 </mujoco>

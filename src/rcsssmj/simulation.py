@@ -342,6 +342,7 @@ class BaseSimulation:
         for client in active_clients:
             joint_names: list[str] = []
             joint_axs: list[float] = []
+            joint_vxs: list[float] = []
             client_perceptions: list[Perception] = [sim_time_perception, game_state_perception]
 
             model_spec = cast(Any, client.get_model_spec())
@@ -355,6 +356,9 @@ class BaseSimulation:
                 if sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTPOS:
                     joint_names.append(sensor_name)
                     joint_axs.append(sensor.data[0])
+
+                elif sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTVEL:
+                    joint_vxs.append(sensor.data[0])
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_GYRO:
                     rvx, rvy, rvz = trunc2_vec(np.degrees(sensor.data[0:3]))
@@ -384,7 +388,7 @@ class BaseSimulation:
 
             # joint state perception
             if joint_names:
-                client_perceptions.append(JointStatePerception(joint_names, trunc2_vec(np.degrees(joint_axs))))
+                client_perceptions.append(JointStatePerception(joint_names, trunc2_vec(np.degrees(joint_axs)), trunc2_vec(np.degrees(joint_vxs))))
 
             # ideal camera sensor-pipeline
             if gen_vision:

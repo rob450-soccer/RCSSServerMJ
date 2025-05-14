@@ -130,7 +130,7 @@ class OrientationPerception(Perception):
 class JointStatePerception(Perception):
     """Sequence of joint perceptions."""
 
-    def __init__(self, joint_names: Sequence[str], axs: Sequence[float]) -> None:
+    def __init__(self, joint_names: Sequence[str], axs: Sequence[float], vxs: Sequence[float]) -> None:
         """Construct a new joint state perception.
 
         Parameter
@@ -140,20 +140,24 @@ class JointStatePerception(Perception):
 
         axs: Sequence[float]
             The list of joint angles.
+        
+        vxs: Sequence[float]
+            The list of joint velocities.
         """
 
         super().__init__('JS')
 
         self.joint_names: Sequence[str] = joint_names
         self.joint_axs: Sequence[float] = axs
+        self.joint_vxs: Sequence[float] = vxs
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (HJ (name <name>) (ax <ax>))*
+        Expression format: (HJ (name <name>) (ax <ax>), (vx <vx>))*
         """
 
-        return ''.join(f'(HJ (name {name})(ax {ax}))' for name, ax in zip(self.joint_names, self.joint_axs, strict=False))
+        return ''.join(f'(HJ (name {name})(ax {ax})(vx {vx}))' for name, ax, vx in zip(self.joint_names, self.joint_axs, self.joint_vxs, strict=False))
 
     def to_sexp2(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -163,8 +167,9 @@ class JointStatePerception(Perception):
 
         names = ' '.join(self.joint_names)
         axs = ' '.join(str(ax) for ax in self.joint_axs)
+        vxs = ' '.join(str(vx) for vx in self.joint_vxs)
 
-        return f'({self.name} (names {names}) (axs {axs}))'
+        return f'({self.name} (names {names}) (axs {axs}) (vxs {vxs}))'
 
 
 class GyroPerception(Perception):
