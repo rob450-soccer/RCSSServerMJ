@@ -43,7 +43,7 @@ class BaseSimulation:
         self,
         *,
         spec_provider: ModelSpecProvider | None = None,
-        n_substeps: int = 5,
+        n_substeps: int = 4,
         vision_interval: int = 4,
     ) -> None:
         """Construct a new simulation.
@@ -356,7 +356,7 @@ class BaseSimulation:
                 if sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTPOS:
                     joint_names.append(sensor_name)
                     joint_axs.append(sensor.data[0])
-
+                
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTVEL:
                     joint_vxs.append(sensor.data[0])
 
