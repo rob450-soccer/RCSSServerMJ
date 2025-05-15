@@ -261,10 +261,12 @@ class SoccerReferee:
         """
 
         return GameStatePerception(
-            score_left=self._state.get_team_score(TeamSide.LEFT),
-            score_right=self._state.get_team_score(TeamSide.RIGHT),
             play_time=self._state.get_play_time(),
             play_mode=self._state.get_play_mode().value,
+            team_left=self._state.get_team_name(TeamSide.LEFT),
+            team_right=self._state.get_team_name(TeamSide.RIGHT),
+            score_left=self._state.get_team_score(TeamSide.LEFT),
+            score_right=self._state.get_team_score(TeamSide.RIGHT),
         )
 
     def beam_agent(self, actuator_name: str, mj_model: Any, mj_data: Any, beam_pose: tuple[float, float, float]) -> None:
