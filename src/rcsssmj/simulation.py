@@ -356,7 +356,7 @@ class BaseSimulation:
                 if sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTPOS:
                     joint_names.append(sensor_name)
                     joint_axs.append(sensor.data[0])
-                
+
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_JOINTVEL:
                     joint_vxs.append(sensor.data[0])
 

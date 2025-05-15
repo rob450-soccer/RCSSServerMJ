@@ -17,16 +17,16 @@ class InitRequest:
         team_name: str,
         player_no: int,
     ) -> None:
-        """ Construct a new initialization request message.
+        """Construct a new initialization request message.
 
         Parameter
         ---------
         model_name : str
             The name of the robot model.
-        
+
         team_name : str
             The name of the team.
-        
+
         player_no : int
             The number of the player.
         """
@@ -42,7 +42,7 @@ class SimAction(ABC):
     """
 
     def __init__(self, actuator_name: str) -> None:
-        """ Construct a new simulation action.
+        """Construct a new simulation action.
 
         Parameter
         ---------
@@ -67,7 +67,7 @@ class MotorAction(SimAction):
     """
 
     def __init__(self, actuator_name: str, q: float, dq: float, kp: float, kd: float, tau: float):
-        """ Construct a new motor action, which produces a torque on the actuator via a PD controller:
+        """Construct a new motor action, which produces a torque on the actuator via a PD controller:
         applied_torque = kp * (q - q_current) + kd * (dq - dq_current) + tau
 
         Parameter
@@ -83,10 +83,10 @@ class MotorAction(SimAction):
 
         kp : float
             The proportional gain of the actuator.
-        
+
         kd : float
             The derivative gain of the actuator.
-        
+
         tau : float
             The torque of the actuator.
         """

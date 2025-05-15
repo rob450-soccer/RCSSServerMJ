@@ -140,7 +140,7 @@ class JointStatePerception(Perception):
 
         axs: Sequence[float]
             The list of joint angles.
-        
+
         vxs: Sequence[float]
             The list of joint velocities.
         """

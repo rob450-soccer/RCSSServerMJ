@@ -3,14 +3,12 @@ import logging
 from math import degrees, pi
 from typing import Any, Final
 
-from scipy.spatial.transform import Rotation as R
-
 from rcsssmj.agent import AgentID, PAgent
 from rcsssmj.client.perception import GameStatePerception, Perception
 from rcsssmj.game.game_state import GameState
 from rcsssmj.game.rules import SoccerRules
 from rcsssmj.game.soccer import TeamSide
-from rcsssmj.mjutils import place_robot_3d
+from rcsssmj.mjutils import place_robot_3d, quat_from_axis_angle
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
 logger = logging.getLogger(__name__)
@@ -298,8 +296,7 @@ class SoccerReferee:
         logger.debug('Beam Team #%d Player #%02d to (%.3f, %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pose[0], pose[1], degrees(pose[2]))
 
         pos = (pose[0], pose[1], 0.6745)
-        orientation_quat = R.from_euler('xyz', [0, 0, pose[2]]).as_quat()
-        mujoco_quat = [orientation_quat[3], orientation_quat[0], orientation_quat[1], orientation_quat[2]]
+        mujoco_quat = quat_from_axis_angle((0, 0, 1), pose[2])
 
         place_robot_3d(agent_id.prefix, mj_model, mj_data, pos, mujoco_quat)
 
