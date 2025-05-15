@@ -232,7 +232,7 @@ class SoccerReferee:
 
         x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
         pos = (x_sign * (2 * agent_id.player_no + 1), field_half_y + field_border, 0.6745)
-        quat = (1, 0, 0, 0)
+        quat = quat_from_axis_angle((0, 0, 1), -pi / 2)
 
         logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], pos[2])
 
