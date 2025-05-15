@@ -172,7 +172,7 @@ class Client:
                 ]).inv()
                 projected_gravity = orientation_quat_inv.apply(np.array([0.0, 0.0, -1.0]))
 
-                wait_until_walking  = max(0, wait_until_walking - 1)
+                wait_until_walking = max(0, wait_until_walking - 1)
                 if wait_until_walking > 0:
                     goal_vel = np.array([0.0, 0.0, 0.0])
                 else:
