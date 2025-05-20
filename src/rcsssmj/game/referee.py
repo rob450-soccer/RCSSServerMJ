@@ -100,9 +100,14 @@ class SoccerReferee:
         goalie_area_half_y = self.rules.field.goalie_area_dim[1]
 
         # resize field
+        pitch_geom = world_spec.geom('pitch')
+        pitch_geom.size[0] = field_half_x
+        pitch_geom.size[1] = field_half_y
+        pitch_geom.size[2] = field_half_z
+
         floor_geom = world_spec.geom('floor')
-        floor_geom.size[0] = field_half_x
-        floor_geom.size[1] = field_half_y
+        floor_geom.size[0] = field_half_x * 1.2
+        floor_geom.size[1] = field_half_y * 1.2
         floor_geom.size[2] = field_half_z
 
         # TODO: handle goals
