@@ -5,6 +5,7 @@ from queue import Queue
 from threading import Thread
 from typing import Any
 
+from rcsssmj.game.game_state import GameState
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import CommandParser, SExprCommandParser
@@ -59,7 +60,7 @@ class SimMonitor(ABC):
         self._state = SimMonitorState.DISCONNECTED
 
     @abstractmethod
-    def update(self, mj_model: Any, mj_data: Any, frame_id: int) -> None:
+    def update(self, mj_model: Any, mj_data: Any, frame_id: int, game_state: GameState) -> None:
         """Update the monitor state.
 
         Parameter
@@ -72,6 +73,9 @@ class SimMonitor(ABC):
 
         frame_id: int
             The current simulation frame id.
+        
+        game_state: GameState
+            The current game state.
         """
 
 
@@ -103,7 +107,7 @@ class TCPSimMonitor(SimMonitor):
         if wait:
             self._receive_thread.join()
 
-    def update(self, mj_model: Any, mj_data: Any, frame_id: int) -> None:
+    def update(self, mj_model: Any, mj_data: Any, frame_id: int, game_state: GameState) -> None:
         # TODO: Generate and send simulation state message to monitor
         pass
 

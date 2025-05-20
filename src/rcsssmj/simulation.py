@@ -787,7 +787,7 @@ class SimServer(BaseSimulation):
 
             # update connected monitors
             for monitor in active_monitors:
-                monitor.update(self._mj_model, self._mj_data, self._frame_id)
+                monitor.update(self._mj_model, self._mj_data, self._frame_id, self.referee.get_state())
 
             # TODO: log monitor message to simulator log
             # TODO: log client perceptions and actions to client logs

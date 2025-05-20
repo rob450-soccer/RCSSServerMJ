@@ -3,8 +3,30 @@ from itertools import cycle
 from typing import Any
 
 import glfw
+from OpenGL.GL import (
+    glPushAttrib,    glPopAttrib,
+    glDisable,       glEnable,
+    glBlendFunc,
+    glColor4f,       glBegin,     glEnd,
+    glVertex2f,
+    glMatrixMode,    glPushMatrix,
+    glPopMatrix,     glLoadIdentity,
+    glOrtho,
+    GL_ALL_ATTRIB_BITS,
+    GL_DEPTH_TEST,
+    GL_LIGHTING,
+    GL_CULL_FACE,
+    GL_BLEND,
+    GL_SRC_ALPHA,
+    GL_ONE_MINUS_SRC_ALPHA,
+    GL_TEXTURE_2D,
+    GL_PROJECTION,   GL_MODELVIEW,
+    GL_QUADS
+)
 import mujoco
 
+from rcsssmj.game.game_state import GameState
+from rcsssmj.game.soccer import TeamSide
 from rcsssmj.monitor.commands import DropBallCommand, KickOffCommand
 from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState
 
@@ -37,8 +59,8 @@ class MujocoMonitor(SimMonitor):
         self.frames: int = 0
         self.last_render_time: float = time.time()
 
-        self.hide_menu: bool = False
-        self.font_scale = 100
+        self.hide_menu: bool = True
+        self.font_scale: int = 200
 
         glfw.init()
         glfw.window_hint(glfw.SCALE_TO_MONITOR, glfw.TRUE)
@@ -81,7 +103,9 @@ class MujocoMonitor(SimMonitor):
         glfw.poll_events()  # make sure there are no pending events, otherwise the window will just freeze and not close properly
         glfw.terminate()
 
-    def update(self, mj_model: Any, mj_data: Any, frame_id: int) -> None:
+    def update(self, mj_model: Any, mj_data: Any, frame_id: int, game_state: GameState) -> None:
+        self.game_state = game_state
+
         if self.model is not mj_model:
             self.model = mj_model
 
@@ -164,11 +188,143 @@ class MujocoMonitor(SimMonitor):
         self.viewport.width, self.viewport.height = glfw.get_framebuffer_size(self.window)
         mujoco.mjr_render(self.viewport, self.scene, self.context)
 
-        # render overlays
+        if self.game_state is not None:
+            w, h = self.viewport.width, self.viewport.height
+            bar_h_start = 30
+            bar_h = 40
+            y0, y1 = h - bar_h - bar_h_start, h - bar_h_start
+            play_mode_bar_y0, play_mode_bar_y1 = y0, y0 - bar_h 
+
+            max_team_str_len = 20
+            max_score_str_len = 5
+            max_time_str_len = 5
+            left_team_txt = self.game_state.get_team_name(TeamSide.LEFT) or "Unknown"[:max_team_str_len]
+            score_text = f"{self.game_state.get_team_score(TeamSide.LEFT)}:{self.game_state.get_team_score(TeamSide.RIGHT)}"[:max_score_str_len]
+            right_team_txt = (self.game_state.get_team_name(TeamSide.RIGHT) or "Unknown")[:max_team_str_len]
+            play_time = self.game_state.get_play_time()
+            mins = int(play_time // 60)
+            secs = int(play_time % 60)
+            time_text = f'{mins:02d}:{secs:02d}'[:max_time_str_len]
+            play_mode_text = f"Playmode: {self.game_state.get_play_mode().value}"
+
+            char_w    = 16
+            box_w     = char_w * max_team_str_len
+            mid_left  = 0.44 * w
+            mid_right = 0.56 * w
+            lx0, lx1  = mid_left  - box_w/2, mid_left  + box_w/2
+            rx0, rx1  = mid_right - box_w/2, mid_right + box_w/2
+            text_y    = int(h - bar_h_start - bar_h/2 - 8)
+
+            sx0, sx1     = lx1, rx0
+
+            time_box_w   = char_w * max_time_str_len
+            padding      = 10
+            tx0          = rx1 + padding
+            tx1          = tx0 + time_box_w
+
+            glPushAttrib(GL_ALL_ATTRIB_BITS)
+            glDisable(GL_DEPTH_TEST)
+            glDisable(GL_LIGHTING)
+            glDisable(GL_CULL_FACE)
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glDisable(GL_TEXTURE_2D)
+
+            glMatrixMode(GL_PROJECTION)
+            glPushMatrix()
+            glLoadIdentity()
+            glOrtho(0, w, 0, h, -1, 1)
+            glMatrixMode(GL_MODELVIEW)
+            glPushMatrix()
+            glLoadIdentity()
+
+            glColor4f(0.2, 0.2, 0.2, 1.0)
+            glBegin(GL_QUADS)
+            glVertex2f(lx0 - 5, y0 - 5)
+            glVertex2f(tx1 + 5, y0 - 5)
+            glVertex2f(tx1 + 5, y1 + 5)
+            glVertex2f(lx0 - 5, y1 + 5)
+            glEnd()
+
+            glColor4f(0.2, 0.2, 0.2, 0.5)
+            glBegin(GL_QUADS)
+            glVertex2f(lx0 - 5, play_mode_bar_y0 - 5)
+            glVertex2f(tx1 + 5, play_mode_bar_y0 - 5)
+            glVertex2f(tx1 + 5, play_mode_bar_y1)
+            glVertex2f(lx0 - 5, play_mode_bar_y1)
+            glEnd()
+
+            glColor4f(0.0, 0.0, 0.8, 0.8)
+            glBegin(GL_QUADS)
+            glVertex2f(lx0, y0)
+            glVertex2f(lx1, y0)
+            glVertex2f(lx1, y1)
+            glVertex2f(lx0, y1)
+            glEnd()
+
+            glColor4f(0.8, 0.0, 0.0, 0.8)
+            glBegin(GL_QUADS)
+            glVertex2f(rx0, y0)
+            glVertex2f(rx1, y0)
+            glVertex2f(rx1, y1)
+            glVertex2f(rx0, y1)
+            glEnd()
+
+            glPopMatrix()
+            glMatrixMode(GL_PROJECTION)
+            glPopMatrix()
+
+            glPopAttrib()
+            glMatrixMode(GL_MODELVIEW)
+
+            mujoco.mjr_text(
+                mujoco.mjtFont.mjFONT_NORMAL,
+                left_team_txt,
+                self.context,
+                (lx0 + ((max_team_str_len - len(left_team_txt)) / 2 * char_w)) / w,
+                (text_y - 12) / h,
+                1.0, 1.0, 1.0
+            )
+            mujoco.mjr_text(
+                mujoco.mjtFont.mjFONT_NORMAL,
+                right_team_txt,
+                self.context,
+                (rx0 + ((max_team_str_len - len(right_team_txt)) / 2 * char_w)) / w,
+                (text_y - 12) / h,
+                1.0, 1.0, 1.0
+            )
+
+            sx_center = sx0 + (sx1 - sx0) / 2
+            mujoco.mjr_text(
+                mujoco.mjtFont.mjFONT_NORMAL,
+                score_text,
+                self.context,
+                (sx_center - (len(score_text) / 2 * char_w) + 5) / w,
+                (text_y - 12) / h,
+                1.0, 1.0, 1.0
+            )
+            mujoco.mjr_text(
+                mujoco.mjtFont.mjFONT_NORMAL,
+                time_text,
+                self.context,
+                (tx0 + ((max_time_str_len - len(time_text)) / 2 * char_w)) / w,
+                (text_y - 12) / h,
+                1.0, 1.0, 1.0
+            )
+
+            mujoco.mjr_text(
+                mujoco.mjtFont.mjFONT_NORMAL,
+                play_mode_text,
+                self.context,
+                (lx0 ) / w,
+                ((text_y - 12) - (bar_h)) / h,
+                1.0, 1.0, 1.0
+            )
+
         if not self.hide_menu:
             overlays = self.create_overlays()
             for gridpos, [t1, t2] in overlays.items():
-                mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_SHADOW, gridpos, self.viewport, t1, t2, self.context)
+                mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, gridpos, self.viewport, t1, t2, self.context)
 
         glfw.swap_buffers(self.window)
         glfw.poll_events()
