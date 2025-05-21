@@ -7,9 +7,7 @@ from rcsssmj.game.referee import SoccerReferee
 
 
 class InitRequest:
-    """
-    Simple class for holding an initialization request message of a simulation client.
-    """
+    """Simple class for holding an initialization request message of a simulation client."""
 
     def __init__(
         self,
@@ -32,14 +30,17 @@ class InitRequest:
         """
 
         self.model_name: Final[str] = model_name
+        """The requested robot model name."""
+
         self.team_name: Final[str] = team_name
+        """The requested team name."""
+
         self.player_no: Final[int] = player_no
+        """The requested player number."""
 
 
 class SimAction(ABC):
-    """
-    Base class for simulation actions.
-    """
+    """Base class for simulation actions."""
 
     def __init__(self, actuator_name: str) -> None:
         """Construct a new simulation action.
@@ -56,15 +57,23 @@ class SimAction(ABC):
 
     @abstractmethod
     def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
-        """
-        Perform this action.
+        """Perform this action.
+
+        Parameter
+        ---------
+        referee: SoccerReferee
+            The soccer referee instance.
+
+        mj_model: MjModel
+            The mujoco model.
+
+        mj_data: MjData
+            The mujoco data array.
         """
 
 
 class MotorAction(SimAction):
-    """
-    Class for representing a motor action.
-    """
+    """Class for representing a motor action."""
 
     def __init__(self, actuator_name: str, q: float, dq: float, kp: float, kd: float, tau: float):
         """Construct a new motor action, which produces a torque on the actuator via a PD controller:
@@ -115,13 +124,18 @@ class MotorAction(SimAction):
 
 
 class BeamAction(SimAction):
-    """
-    Class for representing a beam action.
-    """
+    """Class for representing a beam action."""
 
     def __init__(self, actuator_name: str, target_pose: tuple[float, float, float]):
-        """
-        Construct a new beam action.
+        """Construct a new beam action.
+
+        Parameter
+        ---------
+        actuator_name: str
+            The name of the beam effector.
+
+        target_pose: tuple[float, float, float]
+            The desired target 2D beam pose [x, y, theta].
         """
 
         super().__init__(actuator_name)

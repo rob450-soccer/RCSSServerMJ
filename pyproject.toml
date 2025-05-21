@@ -49,6 +49,7 @@ mjrcssserver = "rcsssmj.__main__:soccer_sim"
 
 [tool.ruff]
 line-length = 240
+exclude = ["doc"]
 
 [tool.ruff.format]
 quote-style = "single"
@@ -86,6 +87,16 @@ extra-dependencies = [
 
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/rcsssmj tests}"
+
+[tool.hatch.envs.doc]
+extra-dependencies = [
+  "sphinx",
+  "pydata-sphinx-theme"
+]
+
+[tool.hatch.envs.doc.scripts]
+html = "sphinx-build -M html doc/source doc/build"
+clean = "sphinx-build -M clean doc/source doc/build"
 
 [tool.hatch.envs.test]
 extra-dependencies = [

@@ -1,4 +1,4 @@
-# MJ RCSSServer
+# RCSSServerMJ
 
 The RoboCup Soccer Simulation Server based on the MuJoCo physics engine.
 

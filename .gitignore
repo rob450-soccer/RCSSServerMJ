@@ -5,9 +5,12 @@ __pycache__/
 
 # build artifacts
 dist/
+build/
+doc/**/generated/
 
 # build caches
 .mypy_cache
+.pytest_cache
 .ruff_cache
 
 # mujoco log

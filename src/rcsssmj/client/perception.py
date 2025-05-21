@@ -41,6 +41,7 @@ class TimePerception(Perception):
         super().__init__(name)
 
         self.time: Final[float] = time
+        """The perceived time."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -75,8 +76,13 @@ class PositionPerception(Perception):
         super().__init__(name)
 
         self.x: Final[float] = x
+        """The x-coordinate of the position."""
+
         self.y: Final[float] = y
+        """The y-coordinate of the position."""
+
         self.z: Final[float] = z
+        """The z-coordinate of the position."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -114,9 +120,16 @@ class OrientationPerception(Perception):
         super().__init__(name)
 
         self.qw: Final[float] = qw
+        """The w-coordinate of the orientation quaternion."""
+
         self.qx: Final[float] = qx
+        """The x-coordinate of the orientation quaternion."""
+
         self.qy: Final[float] = qy
+        """The y-coordinate of the orientation quaternion."""
+
         self.qz: Final[float] = qz
+        """The z-coordinate of the orientation quaternion."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -148,8 +161,13 @@ class JointStatePerception(Perception):
         super().__init__('JS')
 
         self.joint_names: Sequence[str] = joint_names
+        """The list of joint names."""
+
         self.joint_axs: Sequence[float] = axs
+        """THe list of joint axis positions."""
+
         self.joint_vxs: Sequence[float] = vxs
+        """The list of joint velocities."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -196,8 +214,13 @@ class GyroPerception(Perception):
         super().__init__(name)
 
         self.rx: Final[float] = rx
+        """The rotational velocity around the x-axis."""
+
         self.ry: Final[float] = ry
+        """The rotational velocity around the y-axis."""
+
         self.rz: Final[float] = rz
+        """The rotational velocity around the z-axis."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -232,8 +255,13 @@ class AccelerometerPerception(Perception):
         super().__init__(name)
 
         self.ax: Final[float] = ax
+        """The linear acceleration along the x-axis."""
+
         self.ay: Final[float] = ay
+        """The linear acceleration along the y-axis."""
+
         self.az: Final[float] = az
+        """The linear acceleration along the z-axis."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception."""
@@ -259,6 +287,7 @@ class TouchPerception(Perception):
         super().__init__(name)
 
         self.active: Final[int] = active
+        """Flag if bumper is active (!= 0) or inactive (== 0)"""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -307,11 +336,22 @@ class GameStatePerception(Perception):
         super().__init__('GS')
 
         self.play_time: Final[float] = play_time
+        """The current play time."""
+
         self.play_mode: Final[str] = play_mode
+        """The current play mode."""
+
         self.team_left: Final[str | None] = team_left
+        """The name of the left team or None, if no left team has connected yet."""
+
         self.team_right: Final[str | None] = team_right
+        """The name of the right team or None, if no right team has connected yet."""
+
         self.score_left: Final[int] = score_left
+        """The score of the left team."""
+
         self.score_right: Final[int] = score_right
+        """The score of the right team."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -357,9 +397,16 @@ class ObjectDetection:
         """
 
         self.name: Final[str] = name
+        """The name of the object / reference frame."""
+
         self.azimuth: Final[float] = azimuth
+        """The anzimuth (horizontal) angle to the detected point."""
+
         self.inclination: Final[float] = inclination
+        """The elevation (vertical) angle to the detected point."""
+
         self.distance: Final[float] = distance
+        """The distance to the detected point (in meter)."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -395,9 +442,16 @@ class AgentDetection:
         """
 
         self.name: Final[str] = name
+        """The agent Identifier 'P'."""
+
         self.team_name: Final[str] = team_name
+        """The name of the team the player belongs to."""
+
         self.player_no: Final[int] = player_no
+        """The player number."""
+
         self.body_detections: Final[Sequence[ObjectDetection]] = body_detections
+        """The list of individual body part detections."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
@@ -426,6 +480,7 @@ class VisionPerception(Perception):
         super().__init__(name)
 
         self.obj_detections: Final[Sequence[PObjectDetection]] = objects
+        """The list of detected objects."""
 
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
