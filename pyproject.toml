@@ -76,7 +76,8 @@ disallow_untyped_defs = false
 [[tool.mypy.overrides]]
 module = [
   "mujoco.*",
-  "glfw.*"
+  "glfw.*",
+  "OpenGL.*"
 ]
 ignore_missing_imports = true
 

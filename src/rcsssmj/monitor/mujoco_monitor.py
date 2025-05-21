@@ -3,27 +3,34 @@ from itertools import cycle
 from typing import Any
 
 import glfw
+import mujoco
 from OpenGL.GL import (
-    glPushAttrib,    glPopAttrib,
-    glDisable,       glEnable,
-    glBlendFunc,
-    glColor4f,       glBegin,     glEnd,
-    glVertex2f,
-    glMatrixMode,    glPushMatrix,
-    glPopMatrix,     glLoadIdentity,
-    glOrtho,
     GL_ALL_ATTRIB_BITS,
+    GL_BLEND,
+    GL_CULL_FACE,
     GL_DEPTH_TEST,
     GL_LIGHTING,
-    GL_CULL_FACE,
-    GL_BLEND,
-    GL_SRC_ALPHA,
+    GL_MODELVIEW,
     GL_ONE_MINUS_SRC_ALPHA,
+    GL_PROJECTION,
+    GL_QUADS,
+    GL_SRC_ALPHA,
     GL_TEXTURE_2D,
-    GL_PROJECTION,   GL_MODELVIEW,
-    GL_QUADS
+    glBegin,
+    glBlendFunc,
+    glColor4f,
+    glDisable,
+    glEnable,
+    glEnd,
+    glLoadIdentity,
+    glMatrixMode,
+    glOrtho,
+    glPopAttrib,
+    glPopMatrix,
+    glPushAttrib,
+    glPushMatrix,
+    glVertex2f,
 )
-import mujoco
 
 from rcsssmj.game.game_state import GameState
 from rcsssmj.game.soccer import TeamSide
@@ -193,20 +200,21 @@ class MujocoMonitor(SimMonitor):
             bar_h_start = 30
             bar_h = 40
             y0, y1 = h - bar_h - bar_h_start, h - bar_h_start
-            play_mode_bar_y0, play_mode_bar_y1 = y0, y0 - bar_h 
+            play_mode_bar_y0, play_mode_bar_y1 = y0, y0 - bar_h
 
             max_team_str_len = 20
             max_score_str_len = 5
             max_time_str_len = 5
-            left_team_txt = self.game_state.get_team_name(TeamSide.LEFT) or "Unknown"[:max_team_str_len]
-            score_text = f"{self.game_state.get_team_score(TeamSide.LEFT)}:{self.game_state.get_team_score(TeamSide.RIGHT)}"[:max_score_str_len]
-            right_team_txt = (self.game_state.get_team_name(TeamSide.RIGHT) or "Unknown")[:max_team_str_len]
+            left_team_txt = self.game_state.get_team_name(TeamSide.LEFT) or 'Unknown'[:max_team_str_len]
+            score_text = f'{self.game_state.get_team_score(TeamSide.LEFT)}:{self.game_state.get_team_score(TeamSide.RIGHT)}'[:max_score_str_len]
+            right_team_txt = (self.game_state.get_team_name(TeamSide.RIGHT) or 'Unknown')[:max_team_str_len]
             play_time = self.game_state.get_play_time()
             mins = int(play_time // 60)
             secs = int(play_time % 60)
             time_text = f'{mins:02d}:{secs:02d}'[:max_time_str_len]
-            play_mode_text = f"Playmode: {self.game_state.get_play_mode().value}"
+            play_mode_text = f'Playmode: {self.game_state.get_play_mode().value}'
 
+            # fmt: off
             char_w    = 16
             box_w     = char_w * max_team_str_len
             mid_left  = 0.44 * w
@@ -221,6 +229,7 @@ class MujocoMonitor(SimMonitor):
             padding      = 10
             tx0          = rx1 + padding
             tx1          = tx0 + time_box_w
+            # fmt: on
 
             glPushAttrib(GL_ALL_ATTRIB_BITS)
             glDisable(GL_DEPTH_TEST)
@@ -283,7 +292,9 @@ class MujocoMonitor(SimMonitor):
                 self.context,
                 (lx0 + ((max_team_str_len - len(left_team_txt)) / 2 * char_w)) / w,
                 (text_y - 12) / h,
-                1.0, 1.0, 1.0
+                1.0,
+                1.0,
+                1.0,
             )
             mujoco.mjr_text(
                 mujoco.mjtFont.mjFONT_NORMAL,
@@ -291,7 +302,9 @@ class MujocoMonitor(SimMonitor):
                 self.context,
                 (rx0 + ((max_team_str_len - len(right_team_txt)) / 2 * char_w)) / w,
                 (text_y - 12) / h,
-                1.0, 1.0, 1.0
+                1.0,
+                1.0,
+                1.0,
             )
 
             sx_center = sx0 + (sx1 - sx0) / 2
@@ -301,7 +314,9 @@ class MujocoMonitor(SimMonitor):
                 self.context,
                 (sx_center - (len(score_text) / 2 * char_w) + 5) / w,
                 (text_y - 12) / h,
-                1.0, 1.0, 1.0
+                1.0,
+                1.0,
+                1.0,
             )
             mujoco.mjr_text(
                 mujoco.mjtFont.mjFONT_NORMAL,
@@ -309,16 +324,20 @@ class MujocoMonitor(SimMonitor):
                 self.context,
                 (tx0 + ((max_time_str_len - len(time_text)) / 2 * char_w)) / w,
                 (text_y - 12) / h,
-                1.0, 1.0, 1.0
+                1.0,
+                1.0,
+                1.0,
             )
 
             mujoco.mjr_text(
                 mujoco.mjtFont.mjFONT_NORMAL,
                 play_mode_text,
                 self.context,
-                (lx0 ) / w,
+                (lx0) / w,
                 ((text_y - 12) - (bar_h)) / h,
-                1.0, 1.0, 1.0
+                1.0,
+                1.0,
+                1.0,
             )
 
         if not self.hide_menu:

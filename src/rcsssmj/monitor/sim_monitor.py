@@ -5,8 +5,8 @@ from queue import Queue
 from threading import Thread
 from typing import Any
 
-from rcsssmj.game.game_state import GameState
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
+from rcsssmj.game.game_state import GameState
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import CommandParser, SExprCommandParser
 
@@ -73,7 +73,7 @@ class SimMonitor(ABC):
 
         frame_id: int
             The current simulation frame id.
-        
+
         game_state: GameState
             The current game state.
         """
