@@ -164,7 +164,7 @@ class GameState:
     def play_on(self) -> None:
         """Instruct the normal progressing of the game."""
 
-        self.set_play_mode(PlayMode.GAME_OVER)
+        self.set_play_mode(PlayMode.PLAY_ON)
 
     def throw_in(self, team_side: TeamSide) -> None:
         """Instruct a throw in for the given team.
