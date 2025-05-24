@@ -105,12 +105,54 @@ class SoccerReferee:
         pitch_geom.size[1] = field_half_y
         pitch_geom.size[2] = field_half_z
 
-        floor_geom = world_spec.geom('floor')
-        floor_geom.size[0] = field_half_x * 1.2
-        floor_geom.size[1] = field_half_y * 1.2
-        floor_geom.size[2] = field_half_z
-
-        # TODO: handle goals
+        # Add floor around the field
+        floor_color = [0.2, 0.5, 0.2, 1]  # dark green color
+        left_right_floor_x_size = (field_half_x * 1.05) - field_half_x
+        top_bottom_floor_y_size = (field_half_y * 1.05) - field_half_y
+        left_floor_body = world_spec.worldbody.add_body(
+            name='left-floor',
+            pos=(-field_half_x, 0, -field_half_z),
+        )
+        left_floor_body.add_geom(
+            name='left-floor',
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            pos=(0 - left_right_floor_x_size, 0, field_half_z),
+            size=(left_right_floor_x_size, field_half_y, field_half_z),
+            rgba=floor_color,
+        )
+        right_floor_body = world_spec.worldbody.add_body(
+            name='right-floor',
+            pos=(field_half_x, 0, -field_half_z),
+        )
+        right_floor_body.add_geom(
+            name='right-floor',
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            pos=(0 + left_right_floor_x_size, 0, field_half_z),
+            size=(left_right_floor_x_size, field_half_y, field_half_z),
+            rgba=floor_color,
+        )
+        top_floor_body = world_spec.worldbody.add_body(
+            name='top-floor',
+            pos=(0, field_half_y, -field_half_z),
+        )
+        top_floor_body.add_geom(
+            name='top-floor',
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            pos=(0, 0 + top_bottom_floor_y_size, field_half_z),
+            size=(field_half_x + (left_right_floor_x_size * 2), top_bottom_floor_y_size, field_half_z),
+            rgba=floor_color,
+        )
+        bottom_floor_body = world_spec.worldbody.add_body(
+            name='bottom-floor',
+            pos=(0, -field_half_y, -field_half_z),
+        )
+        bottom_floor_body.add_geom(
+            name='bottom-floor',
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            pos=(0, 0 - top_bottom_floor_y_size, field_half_z),
+            size=(field_half_x + (left_right_floor_x_size * 2), top_bottom_floor_y_size, field_half_z),
+            rgba=floor_color,
+        )
 
         # fmt: off
         # field markers
