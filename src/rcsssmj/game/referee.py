@@ -7,7 +7,7 @@ from rcsssmj.agent import AgentID, PAgent
 from rcsssmj.client.perception import GameStatePerception, Perception
 from rcsssmj.game.game_state import GameState
 from rcsssmj.game.rules import SoccerRules
-from rcsssmj.game.soccer import TeamSide
+from rcsssmj.game.soccer import PlayMode, TeamSide
 from rcsssmj.mjutils import place_robot_3d, quat_from_axis_angle
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
@@ -290,6 +290,10 @@ class SoccerReferee:
             Theta is given in radians.
         """
 
+        # check if agents are allowed to beam
+        if not self._is_beaming_allowed():
+            return
+
         agent_id = AgentID.from_prefixed_name(actuator_name)
 
         if not TeamSide.is_valid(agent_id.team_id):
@@ -306,6 +310,11 @@ class SoccerReferee:
         mujoco_quat = quat_from_axis_angle((0, 0, 1), pose[2])
 
         place_robot_3d(agent_id.prefix, mj_model, mj_data, pos, mujoco_quat)
+
+    def _is_beaming_allowed(self) -> bool:
+        """Check if an agent is allowed to beam in the current game state."""
+
+        return self._state.get_play_mode() in (PlayMode.BEFORE_KICK_OFF, PlayMode.GOAL_LEFT, PlayMode.GOAL_RIGHT)
 
     def referee(self, mj_data: Any) -> None:
         """Referee the current simulation state.
