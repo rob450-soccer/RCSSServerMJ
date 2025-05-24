@@ -3,6 +3,8 @@ import logging
 from math import degrees, pi
 from typing import Any, Final
 
+import mujoco
+
 from rcsssmj.agent import AgentID, PAgent
 from rcsssmj.client.perception import GameStatePerception, Perception
 from rcsssmj.game.game_state import GameState
@@ -153,6 +155,139 @@ class SoccerReferee:
             size=(field_half_x + (left_right_floor_x_size * 2), top_bottom_floor_y_size, field_half_z),
             rgba=floor_color,
         )
+
+        # add goals
+        goal_post_color = [0.8, 0.8, 0.8, 1]
+        goal_net_color  = [1, 1, 1, 0.2]
+        for side, x_sign in [('left', -1), ('right', 1)]:
+            goal_name = f'goal-{side}'
+            goal_body = world_spec.worldbody.add_body(
+                name=goal_name,
+                pos=(x_sign * field_half_x, 0, 0),
+            )
+            depth = x_sign * self.rules.field.goal_dim[0]
+
+            # vertical posts
+            goal_body.add_geom(
+                name=f'{goal_name}-front-left-post',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[0, -goal_half_y, goal_z/2],
+                size=[self.rules.field.goal_post_radius, goal_z/2, 0],
+                rgba=goal_post_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-front-right-post',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[0, goal_half_y, goal_z/2],
+                size=[self.rules.field.goal_post_radius, goal_z/2, 0],
+                rgba=goal_post_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-back-left-post',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth, -goal_half_y, goal_z/2],
+                size=[self.rules.field.goal_post_radius, goal_z/2, 0],
+                rgba=goal_post_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-back-right-post',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth, goal_half_y, goal_z/2],
+                size=[self.rules.field.goal_post_radius, goal_z/2, 0],
+                rgba=goal_post_color,
+            )
+
+            # crossbars
+            goal_body.add_geom(
+                name=f'{goal_name}-front-crossbar',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[0, 0, goal_z],
+                size=[self.rules.field.goal_post_radius, goal_half_y, 0],
+                quat=[0, 0, 0.7071068, 0.7071068],
+                rgba=goal_post_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-back-crossbar',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth, 0, goal_z],
+                size=[self.rules.field.goal_post_radius, goal_half_y, 0],
+                quat=[0, 0, 0.7071068, 0.7071068],
+                rgba=goal_post_color,
+            )
+            # side crossbars (roof)
+            goal_body.add_geom(
+                name=f'{goal_name}-left-side-crossbar',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth/2, -goal_half_y, goal_z],
+                size=[self.rules.field.goal_post_radius, abs(depth)/2, 0],
+                quat=[0, 0.7071068 * x_sign, 0, 0.7071068],
+                rgba=goal_post_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-right-side-crossbar',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth/2, goal_half_y, goal_z],
+                size=[self.rules.field.goal_post_radius, abs(depth)/2, 0],
+                quat=[0, -0.7071068 * x_sign, 0, 0.7071068],
+                rgba=goal_post_color,
+            )
+
+            # lower crossbars (ground level)
+            goal_body.add_geom(
+                name=f'{goal_name}-back-lower-crossbar',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth, 0, 0],
+                size=[self.rules.field.goal_post_radius, goal_half_y, 0],
+                quat=[0, 0, 0.7071068, 0.7071068],
+                rgba=goal_post_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-lower-left-side-crossbar',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth/2, -goal_half_y, 0],
+                size=[self.rules.field.goal_post_radius, abs(depth)/2, 0],
+                quat=[0, 0.7071068 * x_sign, 0, 0.7071068],
+                rgba=goal_post_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-lower-right-side-crossbar',
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                pos=[depth/2, goal_half_y, 0],
+                size=[self.rules.field.goal_post_radius, abs(depth)/2, 0],
+                quat=[0, -0.7071068 * x_sign, 0, 0.7071068],
+                rgba=goal_post_color,
+            )
+
+            # nets
+            goal_body.add_geom(
+                name=f'{goal_name}-top-net',
+                type=mujoco.mjtGeom.mjGEOM_BOX,
+                pos=[depth/2, 0, goal_z],
+                size=[abs(depth)/2, goal_half_y, self.rules.field.goal_post_radius],
+                rgba=goal_net_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-back-net',
+                type=mujoco.mjtGeom.mjGEOM_BOX,
+                pos=[depth, 0, goal_z/2],
+                size=[self.rules.field.goal_post_radius, goal_half_y, goal_z/2],
+                rgba=goal_net_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-left-side-net',
+                type=mujoco.mjtGeom.mjGEOM_BOX,
+                pos=[depth/2, -goal_half_y, goal_z/2],
+                size=[abs(depth)/2, self.rules.field.goal_post_radius, goal_z/2],
+                rgba=goal_net_color,
+            )
+            goal_body.add_geom(
+                name=f'{goal_name}-right-side-net',
+                type=mujoco.mjtGeom.mjGEOM_BOX,
+                pos=[depth/2, goal_half_y, goal_z/2],
+                size=[abs(depth)/2, self.rules.field.goal_post_radius, goal_z/2],
+                rgba=goal_net_color,
+            )
+
 
         # fmt: off
         # field markers
