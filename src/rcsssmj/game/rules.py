@@ -82,6 +82,24 @@ class SoccerRules:
     extra_half_time: int = 15 * 60  # officially 15min per extra half
     """The duration (in seconds) of an extra half."""
 
+    kick_off_time: int = 15  # unofficial - use negative values for disabling
+    """The time (in seconds) the kick-off team has exclusive access to the ball."""
+
+    throw_in_time: int = 15  # unofficial - use negative values for disabling
+    """The time (in seconds) the throw-in team has exclusive access to the ball."""
+
+    corner_kick_time: int = 15  # unofficial - use negative values for disabling
+    """The time (in seconds) the corner-kick team has exclusive access to the ball."""
+
+    goal_kick_time: int = 15  # unofficial - use negative values for disabling
+    """The time (in seconds) the goal-kick team has exclusive access to the ball."""
+
+    free_kick_time: int = 15  # unofficial - use negative values for disabling
+    """The time (in seconds) the free-kick team has exclusive access to the ball."""
+
+    direct_free_kick_time: int = 15  # unofficial - use negative values for disabling
+    """The time (in seconds) the direct-free-kick team has exclusive access to the ball."""
+
     goal_pause_time: int = 3  # unofficial
     """The time (in seconds) to "pause" the game after a goal before switching to kick-off playmode for the oppsosite team."""
 

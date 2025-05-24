@@ -504,8 +504,8 @@ class SoccerReferee:
 
         self._state.progress(mj_data.time)
 
-        # check if game is over
-        self._check_game_over()
+        # automatically progress play mode based on timeouts
+        self._check_timeouts()
 
     def request_kickoff(self, team_id: int) -> None:
         """Request kickoff for the given team.
@@ -518,8 +518,53 @@ class SoccerReferee:
 
         self._state.kick_off(TeamSide.from_id(team_id))
 
-    def _check_game_over(self) -> None:
-        """Check if the game is over."""
+    def _check_timeouts(self) -> None:
+        """Check timeouts (game over, kick-off time, throw-in time, etc.) for the current play mode."""
 
+        # check game over
         if self._state.get_play_time() > self.rules.half_time:
             self._state.game_over()
+            return
+
+        def check_timeout(timeout: int, *left_modes: PlayMode) -> bool:
+            """Helper function for checking a play mode specific timeout."""
+            return timeout >= 0 and self._state.in_play_mode(*left_modes) and self._state.get_play_mode_age() > timeout
+
+        # check kick-off time
+        if check_timeout(self.rules.kick_off_time, PlayMode.KICK_OFF_LEFT, PlayMode.KICK_OFF_RIGHT):
+            self._state.play_on()
+            return
+
+        # check throw-in time
+        if check_timeout(self.rules.throw_in_time, PlayMode.THROW_IN_LEFT, PlayMode.THROW_IN_RIGHT):
+            self._state.play_on()
+            return
+
+        # check corner-kick time
+        if check_timeout(self.rules.corner_kick_time, PlayMode.CORNER_KICK_LEFT, PlayMode.CORNER_KICK_RIGHT):
+            self._state.play_on()
+            return
+
+        # check goal-kick time
+        if check_timeout(self.rules.goal_kick_time, PlayMode.GOAL_KICK_LEFT, PlayMode.GOAL_KICK_RIGHT):
+            self._state.play_on()
+            return
+
+        # check free-kick time
+        if check_timeout(self.rules.free_kick_time, PlayMode.FREE_KICK_LEFT, PlayMode.FREE_KICK_RIGHT):
+            self._state.play_on()
+            return
+
+        # check direct-free-kick time
+        if check_timeout(self.rules.direct_free_kick_time, PlayMode.DIRECT_FREE_KICK_LEFT, PlayMode.DIRECT_FREE_KICK_RIGHT):
+            self._state.play_on()
+            return
+
+        # check goal pause time
+        if self._state.in_play_mode(PlayMode.GOAL_LEFT) and self._state.get_play_mode_age() > self.rules.goal_pause_time:
+            self._state.kick_off(TeamSide.RIGHT)
+            return
+
+        if self._state.in_play_mode(PlayMode.GOAL_RIGHT) and self._state.get_play_mode_age() > self.rules.goal_pause_time:
+            self._state.kick_off(TeamSide.LEFT)
+            return
