@@ -111,16 +111,20 @@ class MotorAction(SimAction):
     def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
         del referee  # signal unused parameter
 
-        actuator_model = mj_model.actuator(self.actuator_name)
-        actuator_data = mj_data.actuator(self.actuator_name)
-        if actuator_model is not None:
-            joint_id = actuator_model.trnid[0]
-            joint_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
-            joint_qpos_adr = mj_model.joint(joint_name).qposadr[0]
-            joint_qvel_adr = mj_model.joint(joint_name).dofadr[0]
-            current_q = mj_data.qpos[joint_qpos_adr]
-            current_dq = mj_data.qvel[joint_qvel_adr]
-            actuator_data.ctrl = self.kp * (self.q - current_q) + self.kd * (self.dq - current_dq) + self.tau
+        actuator_tau_model = mj_model.actuator(self.actuator_name + "_tau")
+        actuator_tau_data = mj_data.actuator(self.actuator_name + "_tau")
+        actuator_pos_model = mj_model.actuator(self.actuator_name + "_pos")
+        actuator_pos_data = mj_data.actuator(self.actuator_name + "_pos")
+        actuator_vel_model = mj_model.actuator(self.actuator_name + "_vel")
+        actuator_vel_data = mj_data.actuator(self.actuator_name + "_vel")
+        if actuator_tau_model is not None:
+            actuator_tau_data.ctrl = self.tau
+            actuator_pos_data.ctrl = self.q
+            actuator_vel_data.ctrl = self.dq
+            actuator_pos_model.gainprm[0] = self.kp
+            actuator_pos_model.biasprm[1] = -self.kp
+            actuator_vel_model.gainprm[0] = self.kd
+            actuator_vel_model.biasprm[2] = -self.kd
 
 
 class BeamAction(SimAction):

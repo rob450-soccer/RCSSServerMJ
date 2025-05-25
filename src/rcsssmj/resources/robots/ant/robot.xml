@@ -66,14 +66,37 @@
   </worldbody>
 
   <actuator>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l4e1" joint="hip_4" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l4e2" joint="ankle_4" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l1e1" joint="hip_1" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l1e2" joint="ankle_1" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l2e1" joint="hip_2" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l2e2" joint="ankle_2" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l3e1" joint="hip_3" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" name="l3e2" joint="ankle_3" gear="150"/>
+    <motor name="l4e1_tau" joint="hip_4" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l4e1_pos" joint="hip_4" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l4e1_vel" joint="hip_4" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+
+    <motor name="l4e2_tau" joint="ankle_4" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l4e2_pos" joint="ankle_4" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l4e2_vel" joint="ankle_4" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+
+    <motor name="l1e1_tau" joint="hip_1" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l1e1_pos" joint="hip_1" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l1e1_vel" joint="hip_1" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+
+    <motor name="l1e2_tau" joint="ankle_1" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l1e2_pos" joint="ankle_1" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l1e2_vel" joint="ankle_1" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+
+    <motor name="l2e1_tau" joint="hip_2" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l2e1_pos" joint="hip_2" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l2e1_vel" joint="hip_2" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+
+    <motor name="l2e2_tau" joint="ankle_2" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l2e2_pos" joint="ankle_2" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l2e2_vel" joint="ankle_2" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+
+    <motor name="l3e1_tau" joint="hip_3" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l3e1_pos" joint="hip_3" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l3e1_vel" joint="hip_3" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+
+    <motor name="l3e2_tau" joint="ankle_3" gear="150" ctrllimited="true" ctrlrange="-1.0 1.0"/>
+    <position name="l3e2_pos" joint="ankle_3" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
+    <velocity name="l3e2_vel" joint="ankle_3" gear="150" forcelimited="true" forcerange="-1.0 1.0"/>
   </actuator>
 
   <sensor>
