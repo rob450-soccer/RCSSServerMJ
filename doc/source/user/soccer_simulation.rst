@@ -7,4 +7,4 @@ TODO: Document available soccer field descriptions
 
 TODO: Document visible markers of the soccer field
 
-TODO: Document available soocer rules / rule books
+TODO: Document available soccer rules / rule books

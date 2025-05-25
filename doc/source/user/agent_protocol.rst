@@ -3,11 +3,11 @@
 Agent Protocol
 ==============
 
-This chapter describes the communication protocol used to exchange information between the simultion server and agents.
+This chapter describes the communication protocol used to exchange information between the simulation server and agents.
 The communication protocol is separated into Perceptors - which represent information an agent can receive - and Effectors - which represent information an agent can send.
 
 When using the :ref:`Simulation Server <sim-server>`, information exchange is realized via its TCP/IP based :ref:`network protocol <sim-server_network-protocol>` using specific :ref:`message formats <sim-server_message-formats>`.
-In case of the :ref:`Managed Simuation <managed-sim>`, information is typically exchanged using simple Python data objects.
+In case of the :ref:`Managed Simulation <managed-sim>`, information is typically exchanged using simple Python data objects.
 
 
 .. _agent-protocol_perceptors:
@@ -43,7 +43,7 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the time is trucated to three digits (milliseconds).
+    None. However, the time is truncated to three digits (milliseconds).
 
 
 Message Format
@@ -88,7 +88,7 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the position coordinates are trucated to three digits (millimeter).
+    None. However, the position coordinates are truncated to three digits (millimeter).
 
 
 Message Format
@@ -108,7 +108,7 @@ S-Expression:
 
 .. _agent-protocol_orientation-perceptor:
 
-Orinetation Perceptor
+Orientation Perceptor
 ^^^^^^^^^^^^^^^^^^^^^
 
 Virtual perceptor, representing the orientation of an object in the world.
@@ -134,7 +134,7 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the quaternion coordinates are trucated to three digits.
+    None. However, the quaternion coordinates are truncated to three digits.
 
 
 Message Format
@@ -178,7 +178,7 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the angular velocity values are trucated to two digits.
+    None. However, the angular velocity values are truncated to two digits.
 
 
 Message Format
@@ -222,7 +222,7 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the linear acceleration values are trucated to two digits.
+    None. However, the linear acceleration values are truncated to two digits.
 
 
 Message Format
@@ -266,7 +266,7 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the axis position and velocity values are trucated to two digits.
+    None. However, the axis position and velocity values are truncated to two digits.
 
 
 Message Format
@@ -404,22 +404,22 @@ Frequency
 Point Object Detection
 """"""""""""""""""""""
 
-Point object detections are provided in polar coordinates (specifying the anzimuth, elevation and distance values) where the origin is facing the x-axis.
+Point object detections are provided in polar coordinates (specifying the azimuth, elevation and distance values) where the origin is facing the x-axis.
 
-+---------------+-------+-------+--------------------------------------------------------+
-| Point Object  | Type  | Unit  | Description                                            |
-| Detection     |       |       |                                                        |
-+===============+=======+=======+========================================================+
-| **name**      | str   |       | The unique name of the detected object.                |
-+---------------+-------+-------+--------------------------------------------------------+
-| **azimuth**   | float | deg   | The anzimuth / horizontal angle to the detected point. |
-+---------------+-------+-------+--------------------------------------------------------+
-| **elevation** | float | deg   | The elevation / vertical angle to the detected point.  |
-+---------------+-------+-------+--------------------------------------------------------+
-| **distance**  | float | meter | The distance to the detected point.                    |
-+---------------+-------+-------+--------------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.ObjectDetection`                                  |
-+---------------+-------+-------+--------------------------------------------------------+
++---------------+-------+-------+-------------------------------------------------------+
+| Point Object  | Type  | Unit  | Description                                           |
+| Detection     |       |       |                                                       |
++===============+=======+=======+=======================================================+
+| **name**      | str   |       | The unique name of the detected object.               |
++---------------+-------+-------+-------------------------------------------------------+
+| **azimuth**   | float | deg   | The azimuth / horizontal angle to the detected point. |
++---------------+-------+-------+-------------------------------------------------------+
+| **elevation** | float | deg   | The elevation / vertical angle to the detected point. |
++---------------+-------+-------+-------------------------------------------------------+
+| **distance**  | float | meter | The distance to the detected point.                   |
++---------------+-------+-------+-------------------------------------------------------+
+| :py:class:`rcsssmj.client.perception.ObjectDetection`                                 |
++---------------+-------+-------+-------------------------------------------------------+
 
 Noise Model
     None. However, direction angles and distance values are truncated to two digits.
@@ -546,7 +546,7 @@ This effector is intended to accelerate game setup and typically only respected 
 
 When performing a beam action, the agent is not guaranteed to be placed at the requested location.
 Depending on the game situation, there might be restrictions to certain areas in the world where an agent is allowed to beam.
-Appart from that, the requested beam location might already be occupied by another agent / object.
+Apart from that, the requested beam location might already be occupied by another agent / object.
 In such a the case, the requested beam location might be arbitrary altered by the simulation server.
 
 In case of the soccer simulation, the beam location is always interpreted from the playing side.

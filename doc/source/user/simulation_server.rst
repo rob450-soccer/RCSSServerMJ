@@ -66,10 +66,10 @@ Server\-Agent Communication
 The simulation server exposes a network interface to all agents on TCP port 60000 by default.
 
 When an agent connects to the server, the agent must first send an :ref:`initialization request <agent-protocol_init-request>` message.
-After successfull initialization, the server continuously sends perception messages (one message per simulation cycle) to the agent representing the output of the agent's perceptors.
+After successful initialization, the server continuously sends perception messages (one message per simulation cycle) to the agent representing the output of the agent's perceptors.
 Detailed information about the perceptor message format can be found in the :ref:`Agent Protocol <agent-protocol>` section.
 
-In response to these perceptor messages, the agent may manupulate the state of its robot model within the simulation by sending effector messages.
+In response to these perceptor messages, the agent may manipulate the state of its robot model within the simulation by sending effector messages.
 Effectors are translated to actuator commands (e.g. motor actions) by the simulation server and applied in the subsequent simulation cycle.
 Detailed information about the effector message format can again be found in the :ref:`Agent Protocol <agent-protocol>` section.
 
@@ -77,7 +77,7 @@ Detailed information about the effector message format can again be found in the
 
     **Combine all effector actions for a simulation cycle in a single response message!**
 
-    While an agent can in theory send multiple action messages for a single simulation cycle, it is strongly adviced to combine and send all effector actions in a single response message.
+    While an agent can in theory send multiple action messages for a single simulation cycle, it is strongly advised to combine and send all effector actions in a single response message.
     This is because of the sync-mode of the server.
     If the server runs in sync-mode, it will wait for exactly one response message from each connected agent before simulating the next cycle.
     Thus, sending multiple response messages in a single simulation cycle will likely result in desynchronization between server and agent.
@@ -90,7 +90,7 @@ Server\-Monitor Communication
 
 The simulation server exposes a network interface to all monitors on TCP port 60001 by default.
 
-This interface allows external processes to be periodically notified of the simulation's state for purposes of visualisation, logging, etc.
+This interface allows external processes to be periodically notified of the simulation's state for purposes of visualization, logging, etc.
 In addition, the connected monitors may send various commands to the simulation server, acting as an external game referee.
 
 TODO: describe communication sequence
