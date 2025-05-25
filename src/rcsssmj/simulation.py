@@ -132,7 +132,7 @@ class BaseSimulation:
         Parameter
         ---------
         client: SimClient
-            The simulation cleint to activate.
+            The simulation client to activate.
 
         referee: SoccerReferee
             The referee instance.
@@ -164,7 +164,7 @@ class BaseSimulation:
         Parameter
         ---------
         client: SimClient
-            The simulation cleint to activate.
+            The simulation client to activate.
 
         referee: SoccerReferee
             The referee instance.
@@ -404,7 +404,7 @@ class BaseSimulation:
                     local_obj_pos = np.matmul(camera_rot.T, obj_pos - camera_pos[:, np.newaxis])
 
                     # transform local positions into polar coordinates
-                    anzimuths = trunc2_vec(np.degrees(np.atan2(local_obj_pos[1], local_obj_pos[0])))
+                    azimuths = trunc2_vec(np.degrees(np.atan2(local_obj_pos[1], local_obj_pos[0])))
                     distances = np.linalg.norm(local_obj_pos, axis=0)
                     elevations = trunc2_vec(np.degrees(np.asin(local_obj_pos[2] / distances)))
                     distances = trunc2_vec(distances)
@@ -414,16 +414,16 @@ class BaseSimulation:
                     # check object coordinates for horizontal and vertical view range
                     half_horizontal_range = 60
                     half_vertical_range = 60
-                    obj_visibility = (anzimuths >= -half_horizontal_range) & (anzimuths <= half_horizontal_range) & (elevations >= -half_vertical_range) & (elevations <= half_vertical_range)
+                    obj_visibility = (azimuths >= -half_horizontal_range) & (azimuths <= half_horizontal_range) & (elevations >= -half_vertical_range) & (elevations <= half_vertical_range)
 
                     # extract simple world object detections
-                    obj_detections: list[PObjectDetection] = [ObjectDetection(obj_markers[i][1], anzimuths[i], elevations[i], distances[i]) for i in range(n_world_markers) if obj_visibility[i]]
+                    obj_detections: list[PObjectDetection] = [ObjectDetection(obj_markers[i][1], azimuths[i], elevations[i], distances[i]) for i in range(n_world_markers) if obj_visibility[i]]
 
                     # extract agent object detections
                     idx = n_world_markers
                     for agent in active_clients:
                         n_agent_markers = len(agent.get_model_markers())
-                        agent_detections = [ObjectDetection(obj_markers[i][1], anzimuths[i], elevations[i], distances[i]) for i in range(idx, idx + n_agent_markers) if obj_visibility[i]]
+                        agent_detections = [ObjectDetection(obj_markers[i][1], azimuths[i], elevations[i], distances[i]) for i in range(idx, idx + n_agent_markers) if obj_visibility[i]]
                         if agent_detections:
                             obj_detections.append(AgentDetection('P', agent.get_team_name(), agent.get_player_no(), agent_detections))
 
@@ -438,7 +438,7 @@ class BaseSimulation:
 class SimServer(BaseSimulation):
     """The simulation server component.
 
-    The simulation server is the core server component, responsible for running the central simulation lopp as well as managing client and monitor connections / communication.
+    The simulation server is the core server component, responsible for running the central simulation loop as well as managing client and monitor connections / communication.
     Game specific logic is encapsulated in a referee instance, which is incorporated into the simulation loop.
 
     By default, the simulation server runs in a competition setup mode.
@@ -522,10 +522,10 @@ class SimServer(BaseSimulation):
         """The list of connected monitors."""
 
         self._client_sock: socket.socket | None = None
-        """The socket for listening for incoming client connections (only present after the server has beed started)."""
+        """The socket for listening for incoming client connections (only present after the server has been started)."""
 
         self._monitor_sock: socket.socket | None = None
-        """The socket for listening for incoming monitor connections (only present after the server has beed started)."""
+        """The socket for listening for incoming monitor connections (only present after the server has been started)."""
 
         self._shutdown: bool = True
         """Flag indicating a shutdown request, causing the simulation server to shutdown."""
@@ -747,7 +747,7 @@ class SimServer(BaseSimulation):
                     active_clients.append(client)
                 else:
                     # failed to activate client --> shutdown and remove client
-                    logger.info('Failed to activete player %s. Disconnecting again.', client)
+                    logger.info('Failed to activate player %s. Disconnecting again.', client)
                     client.shutdown()
                     clients_to_remove.append(client)
 
@@ -760,7 +760,7 @@ class SimServer(BaseSimulation):
                 for client in activated_clients:
                     self.referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_model, self._mj_data)
 
-                # calculate forward kinematics / dynamics of newly added robot models (without progrssing the time)
+                # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
                 mujoco.mj_forward(self._mj_model, self._mj_data)
 
             # generate perceptions

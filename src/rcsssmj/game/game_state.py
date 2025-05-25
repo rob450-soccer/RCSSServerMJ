@@ -61,7 +61,7 @@ class GameState:
         return self._play_mode in play_modes
 
     def get_play_mode_time(self, play_mode: PlayMode | None = None) -> float:
-        """Return the play time given playmode has last been activated.
+        """Return the play time given play mode has last been activated.
 
         Parameter
         ---------
