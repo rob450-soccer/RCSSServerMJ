@@ -285,7 +285,7 @@ class BaseSimulation:
             command.perform(referee, self._mj_data)
 
         # call referee to judge the current simulation state and progress the game state
-        referee.referee(self._mj_data)
+        referee.referee(self.mj_model, self._mj_data)
 
         # increment frame id
         self._frame_id += 1

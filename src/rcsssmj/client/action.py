@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Final
 
-import mujoco
-
 from rcsssmj.game.referee import SoccerReferee
 
 
@@ -111,12 +109,12 @@ class MotorAction(SimAction):
     def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
         del referee  # signal unused parameter
 
-        actuator_tau_model = mj_model.actuator(self.actuator_name + "_tau")
-        actuator_tau_data = mj_data.actuator(self.actuator_name + "_tau")
-        actuator_pos_model = mj_model.actuator(self.actuator_name + "_pos")
-        actuator_pos_data = mj_data.actuator(self.actuator_name + "_pos")
-        actuator_vel_model = mj_model.actuator(self.actuator_name + "_vel")
-        actuator_vel_data = mj_data.actuator(self.actuator_name + "_vel")
+        actuator_tau_model = mj_model.actuator(self.actuator_name + '_tau')
+        actuator_tau_data = mj_data.actuator(self.actuator_name + '_tau')
+        actuator_pos_model = mj_model.actuator(self.actuator_name + '_pos')
+        actuator_pos_data = mj_data.actuator(self.actuator_name + '_pos')
+        actuator_vel_model = mj_model.actuator(self.actuator_name + '_vel')
+        actuator_vel_data = mj_data.actuator(self.actuator_name + '_vel')
         if actuator_tau_model is not None:
             actuator_tau_data.ctrl = self.tau
             actuator_pos_data.ctrl = self.q

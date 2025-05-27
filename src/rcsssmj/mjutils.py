@@ -4,6 +4,8 @@ from typing import Any
 import mujoco
 import numpy as np
 
+from rcsssmj.agent import AgentID, decode_agent_prefix
+
 
 def quat_from_axis_angle(axis: tuple[float, float, float], angle: float) -> tuple[float, float, float, float]:
     """Construct a quaternion from the given axis and angle.
@@ -60,3 +62,35 @@ def zero_all_joints(
             mj_data.qpos[qpos_adr] = 0.0
             mj_data.qvel[qvel_adr] = 0.0
             mj_data.qacc[qvel_adr] = 0.0
+
+
+def filter_agent_contacts_with(geom_name: str, mj_model: Any, mj_data: Any) -> set[AgentID]:
+    """Filter contact list for agent contacts with the given geometry.
+
+    Parameter
+    ---------
+    geom_name: str
+        The name of the geometry for which to check contacts.
+
+    mj_model: MjModel
+        The mujoco simulation model.
+
+    mj_data: MjData
+        The mujoco simulation data array.
+    """
+
+    gid = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+
+    agent_contacts: set[AgentID] = set()
+
+    for other_gid in mj_data.contact.geom1[mj_data.contact.geom2 == gid]:
+        other_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_GEOM, other_gid)
+        if (agent_id := decode_agent_prefix(other_name)) is not None:
+            agent_contacts.add(agent_id)
+
+    for other_gid in mj_data.contact.geom2[mj_data.contact.geom1 == gid]:
+        other_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_GEOM, other_gid)
+        if (agent_id := decode_agent_prefix(other_name)) is not None:
+            agent_contacts.add(agent_id)
+
+    return agent_contacts

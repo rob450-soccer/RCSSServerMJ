@@ -4,6 +4,8 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
+from rcsssmj.utils.geometry import AABB2D, AABB3D
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,40 +68,123 @@ class SoccerField:
     Note: Use default values from official FIFA rule book if there exists an equivalent rule. In all other cases try to choose sensible values which work in conjunction with the official FIFA rule book.
     """
 
-    field_dim: tuple[float, float, float] = (105, 68, 40)  # officially between 100 x 64 and 110 x 75 meters (105 x 68 is recommended) - z height is arbitrary
+    field_dim: tuple[float, float, float]
     """The soccer field dimensions, where positive x points towards the right goal, positive z towards the sky and positive y according to the right hand rule."""
 
-    line_width: float = 0.1  # officially max width of 12cm, but at least the goal line has to match the diameter of the goal posts
+    line_width: float
     """The width of the field lines."""
 
-    field_border: float = 3
+    field_border: float
     """The size of the border around the field."""
 
-    goal_dim: tuple[float, float, float] = (1.6, 7.32, 2.44)  # could not find official specification of depth (x dimensions)
+    goal_dim: tuple[float, float, float]
     """The inner soccer goal dimensions without posts and crossbar."""
 
-    goal_post_radius: float = 0.05  # officially max diameter of 12cm, but has to be the same as the goal line width
+    goal_post_radius: float
     """The radius of the soccer goal posts and crossbar (according to official FIFA rules, the diameter of the goal posts have to match the width of the goal line)."""
 
-    penalty_area_dim: tuple[float, float] | None = (5.5, 7.32 + 2 * 5.5)  # official size
-    """The dimensions of the penalty area (if existing)."""
-
-    goalie_area_dim: tuple[float, float] = (16.5, 7.32 + 2 * 16.5)  # official size
+    goalie_area_dim: tuple[float, float]
     """The dimensions of the goalie area."""
 
-    corner_area_radius: float = 1  # official radius
+    penalty_area_dim: tuple[float, float] | None
+    """The dimensions of the penalty area (if existing)."""
+
+    corner_area_radius: float
     """The radius of the corner area."""
 
-    penalty_spot_distance: float = 11  # well known official penalty spot
+    penalty_spot_distance: float
     """The distance of the penalty spot from the goal line."""
 
-    center_circle_radius: float = 9.15  # official radius
+    center_circle_radius: float
     """The radius of the center circle."""
+
+    field_area: AABB2D
+    """The soccer field area."""
+
+    left_goal_box: AABB3D
+    """The left goal volume."""
+
+    right_goal_box: AABB3D
+    """The left goal volume."""
+
+    left_goalie_area: AABB2D
+    """The left goalie area."""
+
+    right_goalie_area: AABB2D
+    """The right goalie area."""
+
+    left_penalty_area: AABB2D | None
+    """The left penalty area."""
+
+    right_penalty_area: AABB2D | None
+    """The right penalty area."""
+
+    def __init__(
+        self,
+        field_dim: tuple[float, float, float],
+        line_width: float,
+        field_border: float,
+        goal_dim: tuple[float, float, float],
+        goal_post_radius: float,
+        goalie_area_dim: tuple[float, float],
+        penalty_area_dim: tuple[float, float] | None,
+        corner_area_radius: float,
+        penalty_spot_distance: float,
+        center_circle_radius: float,
+    ) -> None:
+        """Construct a new soccer field."""
+
+        self.field_dim = field_dim
+        self.line_width = line_width
+        self.field_border = field_border
+        self.goal_dim = goal_dim
+        self.goal_post_radius = goal_post_radius
+        self.goalie_area_dim = goalie_area_dim
+        self.penalty_area_dim = penalty_area_dim
+        self.corner_area_radius = corner_area_radius
+        self.penalty_spot_distance = penalty_spot_distance
+        self.center_circle_radius = center_circle_radius
+
+        field_half_x = field_dim[0] / 2
+        field_half_y = field_dim[1] / 2
+        self.field_area = AABB2D(-field_half_x, field_half_x, -field_half_y, field_half_y)
+
+        goal_half_y = goal_dim[1] / 2
+        self.left_goal_box = AABB3D(-field_half_x - goal_dim[0], -field_half_x, -goal_half_y, goal_half_y, 0, goal_dim[2])
+        self.right_goal_box = AABB3D(field_half_x, field_half_x + goal_dim[0], -goal_half_y, goal_half_y, 0, goal_dim[2])
+
+        ga_half_y = goalie_area_dim[1] / 2
+        self.left_goalie_area = AABB2D(-field_half_x, -field_half_x + goalie_area_dim[0], -ga_half_y, ga_half_y)
+        self.right_goalie_area = AABB2D(field_half_x - goalie_area_dim[0], field_half_x, -ga_half_y, ga_half_y)
+
+        if penalty_area_dim is not None:
+            pa_half_y = penalty_area_dim[1] / 2
+            self.left_penalty_area = AABB2D(-field_half_x, -field_half_x + penalty_area_dim[0], -pa_half_y, pa_half_y)
+            self.right_penalty_area = AABB2D(field_half_x - penalty_area_dim[0], field_half_x, -pa_half_y, pa_half_y)
+        else:
+            self.left_penalty_area = None
+            self.right_penalty_area = None
 
 
 @dataclass
 class FIFASoccerField(SoccerField):
     """Official FIFA soccer field specification."""
+
+    def __init__(self) -> None:
+        """Construct a new FIFA soccer field."""
+
+        super().__init__(
+            field_dim=(105, 68, 40),  # officially between 100 x 64 and 110 x 75 meters (105 x 68 is recommended) - z height is arbitrary
+            line_width=0.1,  # officially max width of 12cm, but at least the goal line has to match the diameter of the goal posts
+            field_border=3.0,
+            goal_dim=(1.6, 7.32, 2.44),  # could not find official specification of depth (x dimensions)
+            goal_post_radius=0.05,  # officially max diameter of 12cm, but has to be the same as the goal line width
+            goalie_area_dim=(5.5, 7.32 + 2 * 5.5),  # official size
+            penalty_area_dim=(16.5, 7.32 + 2 * 16.5),  # official size
+            corner_area_radius=1,  # official radius
+            penalty_spot_distance=11,  # well known official penalty spot
+            center_circle_radius=9.15,  # official radius
+        )
 
 
 @dataclass
@@ -115,8 +200,8 @@ class HLAdult2014SoccerField(SoccerField):
             field_border=2,  # min 0.7m
             goal_dim=(0.6, 2.6, 1.8),
             goal_post_radius=0.05,  # new in 2017: diameter <= 12cm
-            penalty_area_dim=None,  # none specified
             goalie_area_dim=(1, 2.6 + 2 * 1.2),
+            penalty_area_dim=None,  # none specified
             corner_area_radius=0,  # none specified
             penalty_spot_distance=2.1,
             center_circle_radius=0.75,
@@ -136,8 +221,8 @@ class HLAdult2019SoccerField(SoccerField):
             field_border=2,  # min 1m
             goal_dim=(0.6, 2.6, 1.8),
             goal_post_radius=0.05,  # diameter <= 12cm
-            penalty_area_dim=None,  # none specified
             goalie_area_dim=(1, 2.6 + 2 * 1.2),
+            penalty_area_dim=None,  # none specified
             corner_area_radius=0,  # none specified
             penalty_spot_distance=2.1,
             center_circle_radius=1.5,
@@ -157,8 +242,8 @@ class HLAdult2020SoccerField(SoccerField):
             field_border=2,  # min 1m
             goal_dim=(0.6, 2.6, 1.8),
             goal_post_radius=0.05,  # 8cm <= diameter <= 12cm
-            penalty_area_dim=(3, 2.6 + 2 * 1.7),
             goalie_area_dim=(1, 2.6 + 2 * 0.7),
+            penalty_area_dim=(3, 2.6 + 2 * 1.7),
             corner_area_radius=0,  # none specified
             penalty_spot_distance=2.1,
             center_circle_radius=1.5,
