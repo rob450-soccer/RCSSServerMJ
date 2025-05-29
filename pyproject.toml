@@ -38,6 +38,11 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+ogl = [
+  "PyOpenGL",
+]
+
 [project.urls]
 Homepage = "https://gitlab.com/robocup-sim/rcssservermj"
 Documentation = "https://gitlab.com/robocup-sim/rcssservermj"

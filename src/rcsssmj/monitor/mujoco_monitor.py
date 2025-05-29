@@ -4,33 +4,11 @@ from typing import Any
 
 import glfw
 import mujoco
-from OpenGL.GL import (
-    GL_ALL_ATTRIB_BITS,
-    GL_BLEND,
-    GL_CULL_FACE,
-    GL_DEPTH_TEST,
-    GL_LIGHTING,
-    GL_MODELVIEW,
-    GL_ONE_MINUS_SRC_ALPHA,
-    GL_PROJECTION,
-    GL_QUADS,
-    GL_SRC_ALPHA,
-    GL_TEXTURE_2D,
-    glBegin,
-    glBlendFunc,
-    glColor4f,
-    glDisable,
-    glEnable,
-    glEnd,
-    glLoadIdentity,
-    glMatrixMode,
-    glOrtho,
-    glPopAttrib,
-    glPopMatrix,
-    glPushAttrib,
-    glPushMatrix,
-    glVertex2f,
-)
+
+try:
+    from OpenGL import GL
+except ImportError:
+    GL = None
 
 from rcsssmj.game.game_state import GameState
 from rcsssmj.game.soccer import TeamSide
@@ -231,60 +209,61 @@ class MujocoMonitor(SimMonitor):
             tx1          = tx0 + time_box_w
             # fmt: on
 
-            glPushAttrib(GL_ALL_ATTRIB_BITS)
-            glDisable(GL_DEPTH_TEST)
-            glDisable(GL_LIGHTING)
-            glDisable(GL_CULL_FACE)
-            glEnable(GL_BLEND)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            glDisable(GL_TEXTURE_2D)
+            if GL is not None:
+                GL.glPushAttrib(GL.GL_ALL_ATTRIB_BITS)
+                GL.glDisable(GL.GL_DEPTH_TEST)
+                GL.glDisable(GL.GL_LIGHTING)
+                GL.glDisable(GL.GL_CULL_FACE)
+                GL.glEnable(GL.GL_BLEND)
+                GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+                GL.glDisable(GL.GL_TEXTURE_2D)
 
-            glMatrixMode(GL_PROJECTION)
-            glPushMatrix()
-            glLoadIdentity()
-            glOrtho(0, w, 0, h, -1, 1)
-            glMatrixMode(GL_MODELVIEW)
-            glPushMatrix()
-            glLoadIdentity()
+                GL.glMatrixMode(GL.GL_PROJECTION)
+                GL.glPushMatrix()
+                GL.glLoadIdentity()
+                GL.glOrtho(0, w, 0, h, -1, 1)
+                GL.glMatrixMode(GL.GL_MODELVIEW)
+                GL.glPushMatrix()
+                GL.glLoadIdentity()
 
-            glColor4f(0.2, 0.2, 0.2, 1.0)
-            glBegin(GL_QUADS)
-            glVertex2f(lx0 - 5, y0 - 5)
-            glVertex2f(tx1 + 5, y0 - 5)
-            glVertex2f(tx1 + 5, y1 + 5)
-            glVertex2f(lx0 - 5, y1 + 5)
-            glEnd()
+                GL.glColor4f(0.2, 0.2, 0.2, 1.0)
+                GL.glBegin(GL.GL_QUADS)
+                GL.glVertex2f(lx0 - 5, y0 - 5)
+                GL.glVertex2f(tx1 + 5, y0 - 5)
+                GL.glVertex2f(tx1 + 5, y1 + 5)
+                GL.glVertex2f(lx0 - 5, y1 + 5)
+                GL.glEnd()
 
-            glColor4f(0.2, 0.2, 0.2, 0.5)
-            glBegin(GL_QUADS)
-            glVertex2f(lx0 - 5, play_mode_bar_y0 - 5)
-            glVertex2f(tx1 + 5, play_mode_bar_y0 - 5)
-            glVertex2f(tx1 + 5, play_mode_bar_y1)
-            glVertex2f(lx0 - 5, play_mode_bar_y1)
-            glEnd()
+                GL.glColor4f(0.2, 0.2, 0.2, 0.5)
+                GL.glBegin(GL.GL_QUADS)
+                GL.glVertex2f(lx0 - 5, play_mode_bar_y0 - 5)
+                GL.glVertex2f(tx1 + 5, play_mode_bar_y0 - 5)
+                GL.glVertex2f(tx1 + 5, play_mode_bar_y1)
+                GL.glVertex2f(lx0 - 5, play_mode_bar_y1)
+                GL.glEnd()
 
-            glColor4f(0.0, 0.0, 0.8, 0.8)
-            glBegin(GL_QUADS)
-            glVertex2f(lx0, y0)
-            glVertex2f(lx1, y0)
-            glVertex2f(lx1, y1)
-            glVertex2f(lx0, y1)
-            glEnd()
+                GL.glColor4f(0.0, 0.0, 0.8, 0.8)
+                GL.glBegin(GL.GL_QUADS)
+                GL.glVertex2f(lx0, y0)
+                GL.glVertex2f(lx1, y0)
+                GL.glVertex2f(lx1, y1)
+                GL.glVertex2f(lx0, y1)
+                GL.glEnd()
 
-            glColor4f(0.8, 0.0, 0.0, 0.8)
-            glBegin(GL_QUADS)
-            glVertex2f(rx0, y0)
-            glVertex2f(rx1, y0)
-            glVertex2f(rx1, y1)
-            glVertex2f(rx0, y1)
-            glEnd()
+                GL.glColor4f(0.8, 0.0, 0.0, 0.8)
+                GL.glBegin(GL.GL_QUADS)
+                GL.glVertex2f(rx0, y0)
+                GL.glVertex2f(rx1, y0)
+                GL.glVertex2f(rx1, y1)
+                GL.glVertex2f(rx0, y1)
+                GL.glEnd()
 
-            glPopMatrix()
-            glMatrixMode(GL_PROJECTION)
-            glPopMatrix()
+                GL.glPopMatrix()
+                GL.glMatrixMode(GL.GL_PROJECTION)
+                GL.glPopMatrix()
 
-            glPopAttrib()
-            glMatrixMode(GL_MODELVIEW)
+                GL.glPopAttrib()
+                GL.glMatrixMode(GL.GL_MODELVIEW)
 
             mujoco.mjr_text(
                 mujoco.mjtFont.mjFONT_NORMAL,
