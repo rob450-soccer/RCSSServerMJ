@@ -40,16 +40,17 @@ def soccer_sim() -> None:
 
     # fmt: off
     # simulator arguments
-    parser.add_argument('-a', '--host',     help='The server address.',                 default='127.0.0.1', type=str)
-    parser.add_argument('-c', '--cport',    help='The client port.',                    default=60000,       type=int)
-    parser.add_argument('-m', '--mport',    help='The monitor port.',                   default=60001,       type=int)
-    parser.add_argument('-s', '--sync',     help='Run synchronous with agent clients.', default=False,       action='store_true')
-    parser.add_argument('-r', '--realtime', help='Run in real-time mode.',              default=True,        action='store_true')
-    parser.add_argument('-v', '--render',   help='Start internal monitor viewer.',      default=True,        action='store_true')
+    parser.add_argument('-a', '--host',       help='The server address.',                 default='127.0.0.1', type=str)
+    parser.add_argument('-c', '--cport',      help='The client port.',                    default=60000,       type=int)
+    parser.add_argument('-m', '--mport',      help='The monitor port.',                   default=60001,       type=int)
+    parser.add_argument('-S', '--sequential', help='Run sequential with agent clients.',  default=False,       action='store_true')
+    parser.add_argument('-s', '--sync',       help='Run synchronous with agent clients.', default=False,       action='store_true')
+    parser.add_argument('-r', '--realtime',   help='Run in real-time mode.',              default=True,        action='store_true')
+    parser.add_argument('-v', '--render',     help='Start internal monitor viewer.',      default=True,        action='store_true')
 
     # game arguments
-    parser.add_argument('-f', '--field',    help='The soccer field version.',           default=SoccerFieldVersions.FIFA.value, type=str, choices=field_versions)
-    parser.add_argument('-b', '--rules',    help='The soccer rule book.',               default=SoccerRuleBooks.FIFA.value, type=str, choices=rule_books)
+    parser.add_argument('-f', '--field',      help='The soccer field version.',           default=SoccerFieldVersions.FIFA.value, type=str, choices=field_versions)
+    parser.add_argument('-b', '--rules',      help='The soccer rule book.',               default=SoccerRuleBooks.FIFA.value, type=str, choices=rule_books)
     # fmt: on
 
     args = parser.parse_args()
@@ -60,7 +61,7 @@ def soccer_sim() -> None:
     referee = SoccerReferee(rule_book)
 
     # create server
-    server = SimServer(referee, args.host, args.cport, args.mport, sync_mode=args.sync, real_time=args.realtime, render=args.render)
+    server = SimServer(referee, args.host, args.cport, args.mport, sequential_mode=args.sequential, sync_mode=args.sync, real_time=args.realtime, render=args.render)
 
     # register SIGINT handler
     def signal_handler(sig: int, frame: FrameType | int | signal.Handlers | None) -> None:

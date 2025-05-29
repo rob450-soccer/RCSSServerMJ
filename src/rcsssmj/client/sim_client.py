@@ -114,9 +114,6 @@ class SimClient(ABC):
             self._model_spec = spec
             self._model_markers = [(site.name, ''.join(site.name.split('-')[3:-1])) for site in spec.sites if site.name.endswith('-vismarker')]
 
-            # add a dummy action to prevent possible timeout in sync-mode
-            self._action_queue.put([])
-
             self._state = SimClientState.ACTIVE
 
     def shutdown(self, *, wait: bool = False) -> None:

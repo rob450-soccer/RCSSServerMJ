@@ -156,6 +156,8 @@ class BaseSimulation:
 
         client.activate(agent_id, robot_spec)
 
+        logger.info('Player %s joined the game.', client)
+
         return True
 
     def _deactivate_client(self, client: SimClient, referee: SoccerReferee) -> bool:
@@ -199,6 +201,8 @@ class BaseSimulation:
 
             # remove agent from game
             referee.handle_withdrawal(agent_id)
+
+            logger.info('Player %s left the game.', client)
 
             return True
 
@@ -301,8 +305,8 @@ class BaseSimulation:
         referee: SoccerReferee
             The referee instance.
 
-        gen_vision: bool, default=False
-            Generate vision perception.
+        gen_vision: bool, default=None
+            Generate vision perception. If None, vision is generated according to the `vision_interval` attribute.
         """
 
         def trunc2(val: float) -> float:
@@ -434,6 +438,18 @@ class BaseSimulation:
             # forward generated perceptions to client instance
             client.set_perceptions(client_perceptions)
 
+    def _send_perceptions(self, active_clients: Sequence[SimClient]) -> None:
+        """Send the previously generated perceptions to active clients.
+
+        Parameter
+        ---------
+        active_clients: Sequence[SimClient]
+            The list of active clients.
+        """
+
+        for client in active_clients:
+            client.send_perceptions()
+
 
 class SimServer(BaseSimulation):
     """The simulation server component.
@@ -463,6 +479,7 @@ class SimServer(BaseSimulation):
         client_port: int = 60000,
         monitor_port: int = 60001,
         *,
+        sequential_mode: bool = False,
         sync_mode: bool = False,
         real_time: bool = True,
         render: bool = True,
@@ -479,6 +496,9 @@ class SimServer(BaseSimulation):
 
         monitor_port: int, default=60001
             The port on which to listen for incoming monitor connections.
+
+        sequential_mode: bool, default=False
+            Flag for selecting sequential or parallel simulation update loop.
 
         sync_mode: bool, default=False
             Flag specifying if the server should run in sync-mode.
@@ -506,7 +526,10 @@ class SimServer(BaseSimulation):
         self.monitor_port: Final[int] = monitor_port
         """The port on which to listen for incoming monitor connections."""
 
-        self.sync_mode: Final[bool] = sync_mode
+        self.sequential_mode: Final[bool] = sequential_mode
+        """Flag for enabling / disabling sequential mode."""
+
+        self.sync_mode: Final[bool] = sync_mode or sequential_mode or not real_time
         """Flag for enabling / disabling sync mode."""
 
         self.real_time: Final[bool] = real_time
@@ -696,52 +719,222 @@ class SimServer(BaseSimulation):
         if self.render:
             self._monitors.append(MujocoMonitor(self._mj_model, 2))
 
+        # run simulation update loop
+        if self.sequential_mode:
+            self._sequential_update_loop()
+        else:
+            self._parallel_update_loop()
+
+        logger.info('Simulation thread finished.')
+
+    def _filter_clients(self) -> tuple[list[SimClient], list[SimClient], list[SimClient], list[SimClient]]:
+        """Filter simulation clients by state.
+
+        Returns
+        -------
+        connected_clients: list[SimClient]
+            The list of clients in connected state.
+
+        ready_clients: list[SimClient]
+            The list of clients in ready state.
+
+        active_clients: list[SimClient]
+            The list of clients in active state.
+
+        disconnected_clients: list[SimClient]
+            The list of clients in disconnected state.
+        """
+
+        connected_clients: list[SimClient] = []
+        ready_clients: list[SimClient] = []
+        active_clients: list[SimClient] = []
+        disconnected_clients: list[SimClient] = []
+
+        with self._mutex:
+            for client in self._clients:
+                state = client.get_state()
+                if state == SimClientState.CONNECTED:
+                    connected_clients.append(client)
+                elif state == SimClientState.READY:
+                    ready_clients.append(client)
+                elif state == SimClientState.ACTIVE:
+                    active_clients.append(client)
+                # elif state == SimClientState.DISCONNECTED:
+                else:
+                    disconnected_clients.append(client)
+
+        return connected_clients, ready_clients, active_clients, disconnected_clients
+
+    def _filter_monitors(self) -> tuple[list[SimMonitor], list[SimMonitor]]:
+        """Filter simulation monitors by state.
+
+        Returns
+        -------
+        active_monitors: list[SimMonitor]
+            The list of active / connected monitors.
+
+        inactive_monitors: list[SimMonitor]
+            The list of inactive / disconnected monitors.
+        """
+
+        active_monitors: list[SimMonitor] = []
+        inactive_monitors: list[SimMonitor] = []
+
+        with self._mutex:
+            for monitor in self._monitors:
+                if monitor.get_state() == SimMonitorState.CONNECTED:
+                    active_monitors.append(monitor)
+                else:
+                    inactive_monitors.append(monitor)
+
+        return active_monitors, inactive_monitors
+
+    def _remove_clients(self, clients: list[SimClient], monitors: list[SimMonitor]) -> None:
+        """Remove the given lists of clients and monitors.
+
+        Parameter
+        ---------
+        clients: list[SimClient]
+            The list of clients to remove.
+
+        monitors: list[SimMonitor]
+            The list of monitors to remove.
+        """
+
+        with self._mutex:
+            for client in clients:
+                self._clients.remove(client)
+
+            for monitor in monitors:
+                self._monitors.remove(monitor)
+
+    def _parallel_update_loop(self) -> None:
+        """Parallel simulation update loop.
+
+        Note: This method is executed by the simulation thread - don't call it independently!
+        """
+
+        logger.info('Running a parallel simulation update loop.')
+
         needs_recompile: bool = False
         sim_timestep: float = self._mj_model.opt.timestep * self.n_substeps
         cycle_start: float = time.time() - sim_timestep
 
-        # simulation loop
+        # parallel simulation update loop
         while not self._shutdown:
             # filter clients / monitors by state, as their state may change during this simulation step
             # this also simplifies client / monitor removal from the central client / monitor lists
-            ready_clients: list[SimClient] = []
-            active_clients: list[SimClient] = []
-            disconnected_clients: list[SimClient] = []
-            clients_to_remove: list[SimClient] = []
+            _, ready_clients, active_clients, disconnected_clients = self._filter_clients()
+            active_monitors, monitors_to_remove = self._filter_monitors()
+
+            clients_to_remove: list[SimClient] = disconnected_clients.copy()
             activated_clients: list[SimClient] = []
-
-            active_monitors: list[SimMonitor] = []
-            monitors_to_remove: list[SimMonitor] = []
-
-            with self._mutex:
-                for client in self._clients:
-                    if client.get_state() == SimClientState.READY:
-                        ready_clients.append(client)
-                    if client.get_state() == SimClientState.ACTIVE:
-                        active_clients.append(client)
-                    if client.get_state() == SimClientState.DISCONNECTED:
-                        disconnected_clients.append(client)
-                        clients_to_remove.append(client)
-                    else:
-                        # CONNECTED state not relevant here
-                        pass
-
-                for monitor in self._monitors:
-                    if monitor.get_state() == SimMonitorState.CONNECTED:
-                        active_monitors.append(monitor)
-                    else:
-                        monitors_to_remove.append(monitor)
 
             # handle disconnected clients
             for client in disconnected_clients:
-                if self._deactivate_client(client, self.referee):
-                    logger.info('Player %s left the game.', client)
-                    needs_recompile = True
+                needs_recompile |= self._deactivate_client(client, self.referee)
 
             # handle ready clients
             for client in ready_clients:
                 if self._activate_client(client, self.referee):
-                    logger.info('Player %s joined the game.', client)
+                    needs_recompile = True
+                    activated_clients.append(client)
+                else:
+                    # failed to activate client --> shutdown and remove client
+                    logger.info('Failed to activate player %s. Disconnecting again.', client)
+                    client.shutdown()
+                    clients_to_remove.append(client)
+
+            if needs_recompile:
+                self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
+                needs_recompile = False
+
+            # initialize newly activated players
+            if activated_clients:
+                for client in activated_clients:
+                    self.referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_model, self._mj_data)
+
+                # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
+                mujoco.mj_forward(self._mj_model, self._mj_data)
+
+            # generate perceptions
+            self._generate_perceptions(active_clients + activated_clients, self.referee)
+
+            # sleep to match simulation interval
+            if self.real_time:
+                time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
+                cycle_start = time.time()
+
+            # collect client actions
+            # Note: Actions need to be collected before sending perceptions to clients in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
+            client_actions = self._collect_actions(active_clients, block=self.sync_mode)
+
+            # send perceptions
+            self._send_perceptions(active_clients + activated_clients)
+
+            # collect monitor commands
+            monitor_commands = self._collect_commands(active_monitors)
+
+            # progress simulation
+            self._step(client_actions, monitor_commands, self.referee)
+
+            # update connected monitors
+            for monitor in active_monitors:
+                monitor.update(self._mj_model, self._mj_data, self._frame_id, self.referee.get_state())
+
+            # TODO: log monitor message to simulator log
+            # TODO: log client perceptions and actions to client logs
+
+            # remove disconnected clients and monitors
+            self._remove_clients(clients_to_remove, monitors_to_remove)
+
+    def _sequential_update_loop(self) -> None:
+        """Sequential simulation update loop.
+
+        Note: This method is executed by the simulation thread - don't call it independently!
+        """
+
+        logger.info('Running a sequential simulation update loop.')
+
+        needs_recompile: bool = False
+        sim_timestep: float = self._mj_model.opt.timestep * self.n_substeps
+        cycle_start: float = time.time() - sim_timestep
+
+        # sequential simulation update loop
+        while not self._shutdown:
+            # filter clients / monitors by state, as their state may change during this simulation step
+            # this also simplifies client / monitor removal from the central client / monitor lists
+            _, ready_clients, active_clients, disconnected_clients = self._filter_clients()
+            active_monitors, monitors_to_remove = self._filter_monitors()
+
+            clients_to_remove: list[SimClient] = []
+            activated_clients: list[SimClient] = []
+
+            # handle disconnected clients
+            for client in disconnected_clients:
+                needs_recompile |= self._deactivate_client(client, self.referee)
+
+            if needs_recompile:
+                self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
+                needs_recompile = False
+
+            # sleep to match simulation interval
+            if self.real_time:
+                time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
+                cycle_start = time.time()
+
+            # Note: Actions need to be collected before sending perceptions to clients in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
+            client_actions = self._collect_actions(active_clients, block=self.sync_mode)
+
+            # collect monitor commands
+            monitor_commands = self._collect_commands(active_monitors)
+
+            # progress simulation
+            self._step(client_actions, monitor_commands, self.referee)
+
+            # handle ready clients
+            for client in ready_clients:
+                if self._activate_client(client, self.referee):
                     needs_recompile = True
                     activated_clients.append(client)
                     active_clients.append(client)
@@ -763,27 +956,9 @@ class SimServer(BaseSimulation):
                 # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
                 mujoco.mj_forward(self._mj_model, self._mj_data)
 
-            # generate perceptions
+            # Note: In sequential mode, perceptions should ideally be sent directly after the simulation step to give the agents as much time as possible, while the server notifies monitors, etc.
             self._generate_perceptions(active_clients, self.referee)
-
-            # sleep to match simulation interval
-            if self.real_time:
-                time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
-                cycle_start = time.time()
-
-            # collect client actions
-            # Note: This has to be done separate to and before sending perceptions to clients to prevent fetching new actions that arrived while still sending perceptions.
-            client_actions = self._collect_actions(active_clients, block=self.sync_mode)
-
-            # send perceptions
-            for client in active_clients:
-                client.send_perceptions()
-
-            # collect monitor commands
-            monitor_commands = self._collect_commands(active_monitors)
-
-            # progress simulation
-            self._step(client_actions, monitor_commands, self.referee)
+            self._send_perceptions(active_clients)
 
             # update connected monitors
             for monitor in active_monitors:
@@ -792,29 +967,29 @@ class SimServer(BaseSimulation):
             # TODO: log monitor message to simulator log
             # TODO: log client perceptions and actions to client logs
 
-            # remove disconnected clients
-            with self._mutex:
-                for client in clients_to_remove:
-                    self._clients.remove(client)
-
-            # remove inactive monitors
-            with self._mutex:
-                for monitor in monitors_to_remove:
-                    self._monitors.remove(monitor)
-
-        logger.info('Simulation thread finished.')
+            # remove disconnected clients and monitors
+            self._remove_clients(clients_to_remove, monitors_to_remove)
 
 
 class ManagedSim(BaseSimulation):
     """A simulation without the server component, running in sync with a single client, managed externally."""
 
-    def __init__(self) -> None:
-        """Construct a new training simulation."""
+    def __init__(self, *, sequential_mode: bool = False) -> None:
+        """Construct a new managed simulation.
+
+        Parameter
+        ---------
+        sequential_mode: bool, default=False
+            Flag for selecting sequential or parallel simulation update loop.
+        """
 
         super().__init__()
 
         self._referee: SoccerReferee | None = None
         """The game referee."""
+
+        self.sequential_mode: Final[bool] = sequential_mode
+        """Flag for enabling / disabling sequential mode."""
 
         self._clients: Sequence[SimClient] = []
         """The list of active clients."""
@@ -898,8 +1073,11 @@ class ManagedSim(BaseSimulation):
             raise RuntimeError
 
         # send perceptions
-        for client in self._clients:
-            client.send_perceptions()
+        self._send_perceptions(self._clients)
+
+        if self.sequential_mode:
+            # collect actions from clients for current simulation cycle
+            self._client_actions = self._collect_actions(self._clients)
 
         # progress simulation
         self._step(self._client_actions, commands, self._referee)
@@ -907,5 +1085,6 @@ class ManagedSim(BaseSimulation):
         # generate perceptions
         self._generate_perceptions(self._clients, self._referee)
 
-        # buffer actions from client
-        self._client_actions = self._collect_actions(self._clients)
+        if not self.sequential_mode:
+            # buffer actions from clients for next simulation cycle
+            self._client_actions = self._collect_actions(self._clients)
