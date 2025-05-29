@@ -21,7 +21,9 @@ The following example *Dockerfile* is based on *Ubuntu 24.04*.
     FROM ubuntu:24.04
 
     ENV TZ=Europe/Berlin
-    ENV PATH="$PATH:$HOME/.local/bin"
+    ENV PIPX_HOME=/opt/pipx
+    ENV PIPX_BIN_DIR=/usr/local/bin
+    ENV PIPX_MAN_DIR=/usr/local/share/man
     RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
     RUN apt-get update \
