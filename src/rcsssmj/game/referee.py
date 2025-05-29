@@ -1007,3 +1007,54 @@ class SoccerReferee:
         elif pm in (PlayMode.THROW_IN_LEFT, PlayMode.CORNER_KICK_LEFT, PlayMode.FREE_KICK_LEFT, PlayMode.DIRECT_FREE_KICK_LEFT):
             # TODO: relocate all players of the right team that are too close to the ball
             pass
+
+
+class KickChallengeReferee(SoccerReferee):
+    """A referee, applying soccer game rules for a kick-challenge."""
+
+    def __init__(self, rules: SoccerRules) -> None:
+        """Create a new kick challenge referee.
+
+        Parameter
+        ---------
+        rules: SoccerRules
+            The soccer rule book to apply.
+        """
+
+        super().__init__(rules)
+
+        self._start_time: float = -1
+        """The time at which to automatically start the game."""
+
+    def referee(self, mj_model: Any, mj_data: Any) -> None:
+        # check if an agent is connected
+        if self._start_time < 0 and len(self._team_players[TeamSide.LEFT.value]) > 0:
+            self._start_time = self._state.get_sim_time() + 2
+
+        # automatically kick-off left 2 seconds after the first agent connected
+        if self._state.get_play_mode() == PlayMode.BEFORE_KICK_OFF and self._start_time >= 0 and self._start_time <= self._state.get_sim_time():
+            self.kick_off(TeamSide.LEFT)
+
+        # forward to base class
+        super().referee(mj_model, mj_data)
+
+        # calculate challenge score
+        if self._state.get_play_mode() != PlayMode.GAME_OVER:
+            score = int((self._ball.position[0] - abs(self._ball.position[1])) * 100)
+            self._state.set_score(TeamSide.LEFT, score)
+
+    def _check_fouls(self) -> None:
+        # disable no score rule
+        self._team_na_score = None
+
+        # check double-touch rule
+        if self._ball.active_contact is not None and self._ball.active_contact == self._ball.last_contact:
+            self.game_over()
+
+    def _check_location_triggers(self) -> None:
+        # no location triggers in challenge
+        return
+
+    def _relocate_misplaced_players(self, mj_model: Any, mj_data: Any) -> None:
+        # no misplacement of agents in challenges
+        return
