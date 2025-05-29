@@ -1,0 +1,18 @@
+image: ubuntu:latest
+
+pages:
+  stage: deploy
+  before_script:
+    - apt update
+    - apt install -y python3 pipx
+    - pipx install hatch
+    - export PATH="$PATH:$HOME/.local/bin"
+  script:
+    - hatch run doc:html
+    - mkdir public
+    - cp -r doc/build/html/* public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
