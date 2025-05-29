@@ -3,8 +3,8 @@ image: ubuntu:latest
 pages:
   stage: deploy
   before_script:
-    - apt update
-    - apt install -y python3 pipx
+    - apt-get update
+    - apt-get install -y python3 pipx
     - pipx install hatch
     - export PATH="$PATH:$HOME/.local/bin"
   script:
