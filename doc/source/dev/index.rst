@@ -3,6 +3,11 @@
 Development
 ===========
 
+.. toctree::
+   :hidden:
+
+   gitlab
+
 This chapter describes how to get started with developing the simulator.
 
 

@@ -1,12 +1,6 @@
-image: ubuntu:latest
-
 pages:
   stage: deploy
-  before_script:
-    - apt-get update
-    - apt-get install -y python3 pipx
-    - pipx install hatch
-    - export PATH="$PATH:$HOME/.local/bin"
+  image: $CI_REGISTRY/robocup-sim/rcssservermj/uhatch:24.04
   script:
     - hatch run doc:html
     - mkdir public
