@@ -737,8 +737,8 @@ class SoccerReferee:
             The mujoco simulation data array.
         """
 
-        # progress game state
-        self._state.progress(mj_data.time)
+        # update game state times
+        self._state.update(mj_data.time, progress_play_time=self._state.get_play_mode() not in (PlayMode.BEFORE_KICK_OFF, PlayMode.GAME_OVER))
 
         # check game over
         if self._state.get_play_time() >= self.rules.half_time:

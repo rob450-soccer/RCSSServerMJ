@@ -124,21 +124,43 @@ class GameState:
         if team_side == TeamSide.LEFT:
             self.set_play_mode(play_mode_left)
 
-        if team_side == TeamSide.RIGHT:
+        elif team_side == TeamSide.RIGHT:
             self.set_play_mode(play_mode_right)
 
-    def progress(self, sim_time: float) -> None:
-        """Progress the game state by the given time.
+    def set_score(self, team_side: TeamSide, score: int) -> None:
+        """Set the score for the given team.
+
+        Parameter
+        ---------
+        team_side: TeamSide
+            The team for which to set the score.
+
+        score: int
+            The team score.
+        """
+
+        if team_side == TeamSide.LEFT:
+            self._left_team_score = score
+
+        elif team_side == TeamSide.RIGHT:
+            self._right_team_score = score
+
+    def update(self, sim_time: float, *, progress_play_time: bool = True) -> None:
+        """Update the game state with the given simulation time.
 
         Parameter
         ---------
         sim_time: float
-            The current simulation time."""
+            The current simulation time.
+
+        progress_play_time: bool = True
+            Flag if the play time should be progressed based on simulation time.
+        """
 
         dt = sim_time - self._sim_time
         self._sim_time = sim_time
 
-        if self._play_mode not in (PlayMode.BEFORE_KICK_OFF, PlayMode.GAME_OVER):
+        if progress_play_time:
             self._play_time_ms += int(0.5 + dt * 1000)
 
     def goal(self, team_side: TeamSide) -> None:
@@ -147,7 +169,8 @@ class GameState:
         Parameter
         ---------
         team_side: TeamSide
-            The team side for which to give the goal."""
+            The team side for which to give the goal.
+        """
 
         if team_side == TeamSide.LEFT:
             self._left_team_score += 1
