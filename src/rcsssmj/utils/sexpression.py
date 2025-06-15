@@ -71,7 +71,7 @@ class SExpression(Sequence[Union[bytes, bytearray, 'SExpression']]):
 
     def get_expr(self, i: int) -> SExpression:
         """
-        Return the value at the given index as string.
+        Return the value at the given index as symbolic expression.
         """
 
         return cast(SExpression, self._list[i])
