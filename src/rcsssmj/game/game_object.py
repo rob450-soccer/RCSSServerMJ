@@ -120,4 +120,4 @@ class SoccerPlayer:
         """
 
         # update position
-        self.position = mj_data.body('torso').xpos[0:3].astype(np.float64)
+        self.position = mj_data.body(self.agent_id.prefix + 'torso').xpos[0:3].astype(np.float64)

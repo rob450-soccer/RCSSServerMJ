@@ -419,42 +419,18 @@ class SoccerReferee:
         # append new player to team dict
         self._team_players[team_id][agent.get_player_no()] = SoccerPlayer(agent_id, model_spec)
 
-        # set team color
+        # set team color and spawn position
         root_body = model_spec.body('torso')
         root_body.first_geom().rgba = [0, 0, 1, 1] if team_id == TeamSide.LEFT.value else [1, 0, 0, 1]
 
-        return agent_id
-
-    def spawn_agent(self, agent_id: AgentID, mj_model: Any, mj_data: Any) -> None:
-        """Place the given agent at a save (collision free) initial location.
-
-        Parameter
-        ---------
-        agent_id: AgentID
-            The id of the agent to spawn.
-
-        mj_model: MjModel
-            The mujoco simulation model.
-
-        mj_data: MjData
-            The mujoco simulation data array.
-        """
-
-        if not TeamSide.is_valid(agent_id.team_id):
-            msg = 'Invalid team!'
-            raise ValueError(msg)
-
-        # field_half_x = self.rules.field.field_dim[0] / 2
-        field_half_y = self.rules.field.field_dim[1] / 2
-        field_border = self.rules.field.field_border
-
         x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
-        pos = (x_sign * (2 * agent_id.player_no + 1), field_half_y + field_border, 0.6745)
-        quat = quat_from_axis_angle((0, 0, 1), -pi / 2)
+        root_body.pos[0] = x_sign * (2 * agent_id.player_no + 1)
+        root_body.pos[1] = (self.rules.field.field_dim[1] / 2) + self.rules.field.field_border
+        root_body.quat[0:4] = quat_from_axis_angle((0, 0, 1), -pi / 2)
 
-        logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], pos[2])
+        logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f)', agent_id.team_id, agent_id.player_no, root_body.pos[0], root_body.pos[1])
 
-        place_robot_3d(agent_id.prefix, mj_model, mj_data, pos, quat)
+        return agent_id
 
     def handle_withdrawal(self, agent_id: AgentID) -> None:
         """Handle the withdrawal of an agent participating in the game.

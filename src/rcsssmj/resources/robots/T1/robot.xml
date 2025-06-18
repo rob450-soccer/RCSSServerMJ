@@ -47,7 +47,7 @@
   </asset>
 
   <worldbody>
-    <body name="torso" pos="0 0 0">
+    <body name="torso" pos="0 0 0.6735">
       <site name="torso" pos="0.0 0.0 0.0"/>
       <!-- <site name="torso-vismarker" pos="0 0 0"/> -->
       <inertial pos="0.0551365 -1.42058e-06 0.105062" quat="0.99996 1.40561e-05 -0.00899532 -1.39249e-05" mass="11.7" diaginertia="0.0915404 0.0767787 0.0556055"/>

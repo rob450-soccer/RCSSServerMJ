@@ -849,11 +849,7 @@ class SimServer(BaseSimulation):
                 self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
                 needs_recompile = False
 
-            # initialize newly activated players
             if activated_clients:
-                for client in activated_clients:
-                    self.referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_model, self._mj_data)
-
                 # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
                 mujoco.mj_forward(self._mj_model, self._mj_data)
 
@@ -907,7 +903,7 @@ class SimServer(BaseSimulation):
             _, ready_clients, active_clients, disconnected_clients = self._filter_clients()
             active_monitors, monitors_to_remove = self._filter_monitors()
 
-            clients_to_remove: list[SimClient] = []
+            clients_to_remove: list[SimClient] = disconnected_clients.copy()
             activated_clients: list[SimClient] = []
 
             # handle disconnected clients
@@ -948,11 +944,7 @@ class SimServer(BaseSimulation):
                 self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
                 needs_recompile = False
 
-            # initialize newly activated players
             if activated_clients:
-                for client in activated_clients:
-                    self.referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_model, self._mj_data)
-
                 # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
                 mujoco.mj_forward(self._mj_model, self._mj_data)
 
@@ -1034,10 +1026,6 @@ class ManagedSim(BaseSimulation):
 
         # compile modified spec
         self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
-
-        # spawn agents
-        for client in self._clients:
-            self._referee.spawn_agent(cast(AgentID, client.get_id()), self._mj_model, self._mj_data)
 
         # initialize sim data and client perceptions
         self.forward()
