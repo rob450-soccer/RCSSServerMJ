@@ -39,6 +39,7 @@ class KickOffCommand(MonitorCommand):
         super().__init__()
 
         self.team_id: Final[int] = team_id
+        """The id of the team for which to grant a kick-off."""
 
     def perform(self, referee: SoccerReferee, mj_data: Any) -> None:
         del mj_data  # signal unused parameter
@@ -50,22 +51,43 @@ class KickOffCommand(MonitorCommand):
 class DropBallCommand(MonitorCommand):
     """The drop-ball command."""
 
+    def __init__(self, pos: tuple[float, float] | None = None) -> None:
+        """Construct a new drop-ball command.
+
+        Parameter
+        ---------
+        pos: tuple[float, float] | None, default=None
+            The position at which to drop the ball. If ``None``, the ball is dropped at it's current position.
+        """
+
+        super().__init__()
+
+        self.pos: Final[tuple[float, float] | None] = pos
+        """The position at which to drop the ball."""
+
     def perform(self, referee: SoccerReferee, mj_data: Any) -> None:
         del mj_data  # signal unused parameter
 
-        referee.drop_ball()
-        logger.info('[COMMAND] "drop-ball"')
+        referee.drop_ball(self.pos)
+        logger.info('[COMMAND] "drop-ball @ %s"', self.pos)
 
 
 class SetPlayModeCommand(MonitorCommand):
     """The set-play-mode command."""
 
     def __init__(self, play_mode: str) -> None:
-        """Construct a new set-play-mode command."""
+        """Construct a new set-play-mode command.
+
+        Parameter
+        ---------
+        play_mode: str
+            The intended play mode.
+        """
 
         super().__init__()
 
         self.play_mode: Final[str] = play_mode
+        """The intended play mode."""
 
     def perform(self, referee: SoccerReferee, mj_data: Any) -> None:
         del mj_data  # signal unused parameter

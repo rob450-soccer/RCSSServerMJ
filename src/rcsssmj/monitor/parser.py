@@ -60,7 +60,13 @@ class SExprCommandParser(CommandParser):
 
                 elif child[0] == b'ball':
                     # place ball command: (ball (pos <x> <y> <z>) (vel <vx> <vy> <vz>))
-                    pass
+                    pos: tuple[float, float] | None = None
+                    for sub_child in child:
+                        if isinstance(sub_child, SExpression) and sub_child[0] == b'pos':
+                            pos = (sub_child.get_float(1), sub_child.get_float(2))
+                            break
+
+                    commands.append(DropBallCommand(pos))
 
                 elif child[0] == b'agent':
                     # place agent command: (agent (unum <player_number>) (team <team_name>) (pos <x> <y> <z>))
