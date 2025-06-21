@@ -8,8 +8,8 @@ from typing import Any, cast
 
 from rcsssmj.agent import AgentID
 from rcsssmj.client.action import SimAction
-from rcsssmj.client.encoder import PerceptionEncoder, DefaultPerceptionEncoder
-from rcsssmj.client.parser import ActionParser, SoccerActionParser
+from rcsssmj.client.encoder import PerceptionEncoder
+from rcsssmj.client.parser import ActionParser
 from rcsssmj.client.perception import Perception
 from rcsssmj.communication.connection import PConnection
 
@@ -172,13 +172,19 @@ class SimClient(ABC):
 class RemoteSimClient(SimClient):
     """Remote simulation client, utilizing a message based connection to communicate with an external agent process."""
 
-    def __init__(self, conn: PConnection) -> None:
+    def __init__(self, conn: PConnection, parser: ActionParser, encoder: PerceptionEncoder) -> None:
         """Construct a new remote simulation client.
 
         Parameter
         ---------
         conn: PConnection
             The client connection.
+
+        parser: ActionParser
+            The action message parser instance.
+
+        encoder: PerceptionEncoder
+            The perception message encoder instance.
         """
 
         super().__init__()
@@ -186,10 +192,10 @@ class RemoteSimClient(SimClient):
         self._conn: PConnection = conn
         """The client connection for exchanging perception and action messages."""
 
-        self._parser: ActionParser = SoccerActionParser()
+        self._parser: ActionParser = parser
         """Parser for parsing incoming action messages."""
 
-        self._encoder: PerceptionEncoder = DefaultPerceptionEncoder()
+        self._encoder: PerceptionEncoder = encoder
         """Encoder for encoding outgoing perception messages."""
 
         self._receive_thread: Thread = Thread(target=self._receive_loop)

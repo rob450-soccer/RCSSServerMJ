@@ -1,16 +1,17 @@
 import logging
-import socket
-import time
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from queue import Empty
-from threading import Lock, Thread
+from threading import Lock
 from typing import Any, Final, cast
 
 import mujoco
 import numpy as np
 
-from rcsssmj.agent import AgentID
+from rcsssmj.agent import AgentID, PAgent
 from rcsssmj.client.action import SimAction
+from rcsssmj.client.encoder import DefaultPerceptionEncoder, PerceptionEncoder
+from rcsssmj.client.parser import ActionParser, DefaultActionParser
 from rcsssmj.client.perception import (
     AccelerometerPerception,
     AgentDetection,
@@ -26,38 +27,62 @@ from rcsssmj.client.perception import (
     VisionPerception,
 )
 from rcsssmj.client.sim_client import RemoteSimClient, SimClient, SimClientState
-from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
+from rcsssmj.communication.connection import PConnection
 from rcsssmj.game.referee import SoccerReferee
 from rcsssmj.monitor.commands import MonitorCommand
-from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
+from rcsssmj.monitor.parser import CommandParser, DefaultCommandParser
 from rcsssmj.monitor.sim_monitor import RemoteSimMonitor, SimMonitor, SimMonitorState
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
 logger = logging.getLogger(__name__)
 
 
-class BaseSimulation:
+class BaseSimulation(ABC):
     """Base class for simulations."""
 
     def __init__(
         self,
         *,
+        action_parser: ActionParser | None = None,
+        perception_encoder: PerceptionEncoder | None = None,
+        command_parser: CommandParser | None = None,
         spec_provider: ModelSpecProvider | None = None,
         n_substeps: int = 4,
-        vision_interval: int = 4,
+        vision_interval: int = 1,
     ) -> None:
         """Construct a new simulation.
 
         Parameter
         ---------
-        substeps: int, default=5
+        action_parser: ActionParser | None, default=None
+            Parser instance for parsing remote client actions.
+
+        perception_encoder: PerceptionEncoder | None, default=None
+            Encoder instance for encoding perceptions for remote clients.
+
+        command_parser: CommandParser | None, default=None
+            Parser instance for parsing remote monitor commands.
+
+        spec_provider: ModelSpecProvider | None, default=None
+            MuJoCo model specification provider instance to use for loading model specifications.
+
+        substeps: int, default=4
             The number of simulation substeps between the agent update cycles.
 
-        vision_interval: int, default=4
+        vision_interval: int, default=1
             The interval in which vision perception will be generated.
         """
 
-        self._spec_provider: ModelSpecProvider = ModelSpecProvider() if spec_provider is None else spec_provider
+        self.action_parser: Final[ActionParser] = DefaultActionParser() if action_parser is None else action_parser
+        """Parser for parsing client action messages."""
+
+        self.perception_encoder: Final[PerceptionEncoder] = DefaultPerceptionEncoder() if perception_encoder is None else perception_encoder
+        """Encoder for encoding client perception messages."""
+
+        self.command_parser: Final[CommandParser] = DefaultCommandParser() if command_parser is None else command_parser
+        """Parser for parsing monitor command messages."""
+
+        self.spec_provider: Final[ModelSpecProvider] = ModelSpecProvider() if spec_provider is None else spec_provider
         """Mujoco model specification provider for loading models."""
 
         self.n_substeps: Final[int] = n_substeps
@@ -80,6 +105,15 @@ class BaseSimulation:
 
         self._world_markers: Sequence[tuple[str, str]] = []
         """The sequence of world markers used for generating vision perceptions."""
+
+        self._clients: list[SimClient] = []
+        """The list of connected clients."""
+
+        self._monitors: list[SimMonitor] = []
+        """The list of connected monitors."""
+
+        self._mutex: Lock = Lock()
+        """Mutex for synchronizing simulation threads."""
 
     @property
     def frame_id(self) -> int:
@@ -105,11 +139,137 @@ class BaseSimulation:
 
         return self._mj_data
 
-    def _create_world(self, referee: SoccerReferee) -> bool:
-        """(Re-)initialize the game and create a new simulation world environment."""
+    def register_clients(self, *client_or_conns: SimClient | PConnection) -> None:
+        """Register new clients with the simulation.
+
+        Parameter
+        ---------
+        *client_or_conns: SimClient | PConnection
+            The client instances to add / connections for which to add remote clients.
+        """
+
+        # create remote client instances in case the parameter contain connections
+        clients = [client_or_conn if isinstance(client_or_conn, SimClient) else RemoteSimClient(client_or_conn, self.action_parser, self.perception_encoder) for client_or_conn in client_or_conns]
+
+        with self._mutex:
+            self._clients.extend(clients)
+
+    def register_monitors(self, *monitor_or_conns: SimMonitor | PConnection) -> None:
+        """Register new monitors with the simulation.
+
+        Parameter
+        ---------
+        *monitor_or_conns: SimMonitor | PConnection
+            The monitor instances to add / connections for which to add remote monitors.
+        """
+
+        # create remote monitor instances in case the parameter contain connections
+        monitors = [monitor_or_conn if isinstance(monitor_or_conn, SimMonitor) else RemoteSimMonitor(monitor_or_conn, self.command_parser) for monitor_or_conn in monitor_or_conns]
+
+        with self._mutex:
+            self._monitors.extend(monitors)
+
+    def remove_clients(self, *clients: SimClient) -> None:
+        """Remove the given clients from the simulation.
+
+        Note:
+        This method will not automatically deactivate the given clients.
+        Make sure to deactivate the client instances before calling this method.
+
+        Parameter
+        ---------
+        *clients: SimClient
+            The client instances to remove.
+        """
+
+        with self._mutex:
+            for client in clients:
+                self._clients.remove(client)
+
+    def remove_monitors(self, *monitors: SimMonitor) -> None:
+        """Remove the given monitors from the simulation.
+
+        Note:
+        This method will not automatically deactivate the given monitors.
+        Make sure to shutdown the monitor instances before calling this method.
+
+        Parameter
+        ---------
+        *monitors: SimMonitor
+            The monitor instances to remove.
+        """
+
+        with self._mutex:
+            for monitor in monitors:
+                self._monitors.remove(monitor)
+
+    def filter_clients(self) -> tuple[list[SimClient], list[SimClient], list[SimClient], list[SimClient]]:
+        """Filter simulation clients by state.
+
+        Returns
+        -------
+        connected_clients: list[SimClient]
+            The list of clients in connected state.
+
+        ready_clients: list[SimClient]
+            The list of clients in ready state.
+
+        active_clients: list[SimClient]
+            The list of clients in active state.
+
+        disconnected_clients: list[SimClient]
+            The list of clients in disconnected state.
+        """
+
+        connected_clients: list[SimClient] = []
+        ready_clients: list[SimClient] = []
+        active_clients: list[SimClient] = []
+        disconnected_clients: list[SimClient] = []
+
+        with self._mutex:
+            for client in self._clients:
+                state = client.get_state()
+                if state == SimClientState.CONNECTED:
+                    connected_clients.append(client)
+                elif state == SimClientState.READY:
+                    ready_clients.append(client)
+                elif state == SimClientState.ACTIVE:
+                    active_clients.append(client)
+                # elif state == SimClientState.DISCONNECTED:
+                else:
+                    disconnected_clients.append(client)
+
+        return connected_clients, ready_clients, active_clients, disconnected_clients
+
+    def filter_monitors(self) -> tuple[list[SimMonitor], list[SimMonitor]]:
+        """Filter simulation monitors by state.
+
+        Returns
+        -------
+        active_monitors: list[SimMonitor]
+            The list of active / connected monitors.
+
+        inactive_monitors: list[SimMonitor]
+            The list of inactive / disconnected monitors.
+        """
+
+        active_monitors: list[SimMonitor] = []
+        inactive_monitors: list[SimMonitor] = []
+
+        with self._mutex:
+            for monitor in self._monitors:
+                if monitor.get_state() == SimMonitorState.CONNECTED:
+                    active_monitors.append(monitor)
+                else:
+                    inactive_monitors.append(monitor)
+
+        return active_monitors, inactive_monitors
+
+    def init(self) -> bool:
+        """Initialize the game and create a new simulation world environment."""
 
         # initialize game and create game world environment
-        self._mj_spec = referee.init_game(self._spec_provider)
+        self._mj_spec = self._create_world()
         if self._mj_spec is None:
             logger.warning('Failed to initialize game.')
             return False
@@ -126,26 +286,71 @@ class BaseSimulation:
 
         return True
 
-    def _activate_client(self, client: SimClient, referee: SoccerReferee) -> bool:
+    def shutdown(self, *, wait: bool = False) -> None:
+        """Shutdown simulation."""
+
+        # shutdown active clients
+        for client in self._clients:
+            client.shutdown(wait=wait)
+        self._clients.clear()
+
+        # shutdown active monitors
+        for monitor in self._monitors:
+            monitor.shutdown(wait=wait)
+        self._monitors.clear()
+
+        self._mj_spec = None
+        self._mj_model = None
+        self._mj_data = None
+        self._world_markers = []
+
+    def activate_clients(self, ready_clients: Sequence[SimClient]) -> tuple[list[SimClient], list[SimClient]]:
+        """Try activate the given list of clients.
+
+        Parameter
+        ---------
+        ready_clients: Sequence[SimClient]
+            The list of clients to activate.
+        """
+
+        activated_clients: list[SimClient] = []
+        clients_to_remove: list[SimClient] = []
+
+        for client in ready_clients:
+            if self._activate_client(client):
+                activated_clients.append(client)
+            else:
+                # failed to activate client --> shutdown and remove client
+                logger.info('Failed to activate client %s. Shutting down client again.', client)
+                client.shutdown()
+                clients_to_remove.append(client)
+
+        if activated_clients:
+            # recompile spec in case new clients got added
+            self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
+
+            # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
+            mujoco.mj_forward(self._mj_model, self._mj_data)
+
+        return activated_clients, clients_to_remove
+
+    def _activate_client(self, client: SimClient) -> bool:
         """Try to activate the given client.
 
         Parameter
         ---------
         client: SimClient
             The simulation client to activate.
-
-        referee: SoccerReferee
-            The referee instance.
         """
 
         # try to load the robot model requested by the client
-        robot_spec = self._spec_provider.load_robot(client.get_model_name())
+        robot_spec = self.spec_provider.load_robot(client.get_model_name())
         if robot_spec is None:
             # failed to load the requested model --> report failure
             return False
 
         # request participation in game
-        agent_id = referee.request_participation(client, robot_spec)
+        agent_id = self._request_participation(client, robot_spec)
         if agent_id is None:
             # invalid team side -> report failure
             return False
@@ -160,16 +365,30 @@ class BaseSimulation:
 
         return True
 
-    def _deactivate_client(self, client: SimClient, referee: SoccerReferee) -> bool:
+    def deactivate_clients(self, clients: Sequence[SimClient]) -> None:
+        """Deactivate the given list of clients.
+
+        Parameter
+        ---------
+        clients: Sequence[SimClient]
+            The list of client instances to deactivate.
+        """
+
+        recompile_spec = False
+
+        for client in clients:
+            recompile_spec |= self._deactivate_client(client)
+
+        if recompile_spec:
+            self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
+
+    def _deactivate_client(self, client: SimClient) -> bool:
         """Deactivate the given client instance.
 
         Parameter
         ---------
         client: SimClient
             The simulation client to activate.
-
-        referee: SoccerReferee
-            The referee instance.
         """
 
         # check if client has been activated before
@@ -200,7 +419,7 @@ class BaseSimulation:
             del_els(model_spec.textures)
 
             # remove agent from game
-            referee.handle_withdrawal(agent_id)
+            self._handle_withdrawal(agent_id)
 
             logger.info('Player %s left the game.', client)
 
@@ -208,7 +427,7 @@ class BaseSimulation:
 
         return False
 
-    def _collect_actions(self, active_clients: Sequence[SimClient], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
+    def collect_actions(self, active_clients: Sequence[SimClient], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
         """Collect the actions from all active clients.
 
         Parameter
@@ -247,7 +466,7 @@ class BaseSimulation:
 
         return client_actions
 
-    def _collect_commands(self, active_monitors: Sequence[SimMonitor]) -> list[MonitorCommand]:
+    def collect_commands(self, active_monitors: Sequence[SimMonitor]) -> list[MonitorCommand]:
         """Collect the commands from all active monitors.
 
         Parameter
@@ -268,13 +487,19 @@ class BaseSimulation:
 
         return monitor_commands
 
-    def _step(self, client_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand], referee: SoccerReferee) -> None:
+    def step(self, client_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand], referee: SoccerReferee) -> None:
         """Perform a simulation step.
 
         Parameter
         ---------
-        active_monitors: Sequence[SimMonitor]
-            The list of active monitors.
+        client_actions: Sequence[SimAction]
+            The list of simulation actions.
+
+        monitor_commands: Sequence[MonitorCommand]
+            The list of monitor commands.
+
+        referee: SoccerReferee
+            The referee instance.
         """
 
         # apply client actions
@@ -294,16 +519,13 @@ class BaseSimulation:
         # increment frame id
         self._frame_id += 1
 
-    def _generate_perceptions(self, active_clients: Sequence[SimClient], referee: SoccerReferee, *, gen_vision: bool | None = None) -> None:
+    def generate_perceptions(self, active_clients: Sequence[SimClient], *, gen_vision: bool | None = None) -> None:
         """Generate perceptions for active clients.
 
         Parameter
         ---------
         active_clients: Sequence[SimClient]
             The list of clients considered as active in this simulation cycle.
-
-        referee: SoccerReferee
-            The referee instance.
 
         gen_vision: bool, default=None
             Generate vision perception. If None, vision is generated according to the `vision_interval` attribute.
@@ -327,7 +549,7 @@ class BaseSimulation:
 
         # generate general perceptions equal for all clients
         sim_time_perception = TimePerception('now', trunc2(self._mj_data.time))
-        game_state_perception = referee.generate_perception()
+        game_state_perception = self._generate_game_state_perception()
 
         if gen_vision:
             # collect visible markers
@@ -438,7 +660,7 @@ class BaseSimulation:
             # forward generated perceptions to client instance
             client.set_perceptions(client_perceptions)
 
-    def _send_perceptions(self, active_clients: Sequence[SimClient]) -> None:
+    def send_perceptions(self, active_clients: Sequence[SimClient]) -> None:
         """Send the previously generated perceptions to active clients.
 
         Parameter
@@ -450,625 +672,59 @@ class BaseSimulation:
         for client in active_clients:
             client.send_perceptions()
 
-
-class SimServer(BaseSimulation):
-    """The simulation server component.
-
-    The simulation server is the core server component, responsible for running the central simulation loop as well as managing client and monitor connections / communication.
-    Game specific logic is encapsulated in a referee instance, which is incorporated into the simulation loop.
-
-    By default, the simulation server runs in a competition setup mode.
-    This means that it will try to simulate in real time and will not wait for client actions to arrive before the next simulation cycle.
-    In this scenario, connected clients are responsible for managing their resources and performance to respond in time (as it is the case for a real robot, too).
-
-    However, the server also offers a set of flags with which you can setup the server in a training / evaluation mode.
-    Use the `sync_mode` flag to tell the server to wait for an action response of all active agents before simulating the next simulation cycle.
-    When disabling the `real_time` flag, the server will not wait between simulation cycles to simulate a real-time scenario.
-    Instead, it will directly progress to simulating the next simulation cycle - aka run "as-fast-as-possible".
-    When disabling the `real_time` flag, it is adviced to activate sync mode, too, as otherwise there will be some severe desync between server and client processes.
-
-    At this point in time, the simulation server comes with a built-in mujoco viewer as internal monitor, which will be started by default.
-    Note that due to the Python GIL and the fact that the mujoco viewer is designed to run synchronously, rendering will impact the real-time capability of the simulation in certain scenarios.
-    You can disable the internal monitor component by setting the `render` flag to `False`.
-    """
-
-    def __init__(
-        self,
-        referee: SoccerReferee,
-        host: str = '127.0.0.1',
-        client_port: int = 60000,
-        monitor_port: int = 60001,
-        *,
-        sequential_mode: bool = False,
-        sync_mode: bool = False,
-        real_time: bool = True,
-        render: bool = True,
-    ) -> None:
-        """Construct a new simulation sever.
+    def update_monitors(self, active_monitors: Sequence[SimMonitor], referee: SoccerReferee) -> None:
+        """Update active monitors.
 
         Parameter
         ---------
-        host: str
-            The server host address.
-
-        client_port: int, default=60000
-            The port on which to listen for incoming client connections.
-
-        monitor_port: int, default=60001
-            The port on which to listen for incoming monitor connections.
-
-        sequential_mode: bool, default=False
-            Flag for selecting sequential or parallel simulation update loop.
-
-        sync_mode: bool, default=False
-            Flag specifying if the server should run in sync-mode.
-            In sync-mode (True), the server will waiting in each simulation cycle until all actions of all active agents arrived before simulating the next cycle.
-            If sync-mode is disabled (default, False), then the server will not wait for any connected agents and simply process the actions that arrived in time for the next simulation cycle.
-
-        real_time: bool, default=True
-            Flag specifying if the server should run in real-time mode (default, True) or as-fast-as-possible (False).
-
-        render: bool, default=True
-            Flag for enabling (default, True) or disabling (False) the internal monitor viewer.
-        """
-
-        super().__init__()
-
-        self.referee: Final[SoccerReferee] = referee
-        """The game referee responsible for managing the game aspect of the simulation."""
-
-        self.host: Final[str] = host
-        """The server host address."""
-
-        self.client_port: Final[int] = client_port
-        """The port on which to listen for incoming client connections."""
-
-        self.monitor_port: Final[int] = monitor_port
-        """The port on which to listen for incoming monitor connections."""
-
-        self.sequential_mode: Final[bool] = sequential_mode
-        """Flag for enabling / disabling sequential mode."""
-
-        self.sync_mode: Final[bool] = sync_mode or sequential_mode or not real_time
-        """Flag for enabling / disabling sync mode."""
-
-        self.real_time: Final[bool] = real_time
-        """Flag for enabling / disabling real-time mode."""
-
-        self.render: Final[bool] = render
-        """Flag for enabling / disabling the internal mujoco viewer monitor."""
-
-        self._clients: list[SimClient] = []
-        """The list of connected clients."""
-
-        self._monitors: list[SimMonitor] = []
-        """The list of connected monitors."""
-
-        self._client_sock: socket.socket | None = None
-        """The socket for listening for incoming client connections (only present after the server has been started)."""
-
-        self._monitor_sock: socket.socket | None = None
-        """The socket for listening for incoming monitor connections (only present after the server has been started)."""
-
-        self._shutdown: bool = True
-        """Flag indicating a shutdown request, causing the simulation server to shutdown."""
-
-        self._mutex: Lock = Lock()
-        """Mutex for synchronizing simulation threads."""
-
-    def run(self) -> None:
-        """Run simulation server."""
-
-        if self._client_sock is not None or self._monitor_sock is not None:
-            # a simulation is already running...
-            raise RuntimeError
-
-        # 1. SETUP: Setup sockets and start server threads
-        logger.info('Starting server...')
-        self._shutdown = False
-
-        # setup client socket
-        self._client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._client_sock.bind((self.host, self.client_port))
-        self._client_sock.listen(5)
-
-        # setup monitor socket
-        try:
-            self._monitor_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._monitor_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self._monitor_sock.bind((self.host, self.monitor_port))
-            self._monitor_sock.listen(5)
-        except ConnectionError:
-            self._client_sock.shutdown(socket.SHUT_RDWR)
-            self._client_sock.close()
-            raise
-
-        # create simulator threads
-        sim_thread = Thread(target=self._run_simulation, name='sim_loop')
-        client_listener_thread = Thread(target=self._listen_for_clients, name='client_connections_listener')
-        monitor_listener_thread = Thread(target=self._listen_for_monitors, name='monitor_connections_listener')
-
-        # start simulator threads
-        client_listener_thread.start()
-        monitor_listener_thread.start()
-        sim_thread.start()
-
-        logger.info('Starting server... DONE!')
-
-        # 2. RUN: Wait until simulation thread finished
-        sim_thread.join()  # run simulation loop in separate thread to isolate exceptions and allow the main thread to clean up
-
-        # 3. CLEANUP: Shutdown everything and wait for socket threads to finish
-        logger.info('Shutting down Server...')
-        self._shutdown = True
-
-        # shutdown client and monitor sockets
-        try:
-            self._client_sock.shutdown(socket.SHUT_RDWR)
-        except Exception:  # noqa: BLE001
-            logger.debug('ERROR while shutting down client socket!', exc_info=True)
-
-        try:
-            self._monitor_sock.shutdown(socket.SHUT_RDWR)
-        except Exception:  # noqa: BLE001
-            logger.debug('ERROR while shutting down monitor socket!', exc_info=True)
-
-        # wait for client and monitor connection listener threads to finish
-        client_listener_thread.join()
-        monitor_listener_thread.join()
-
-        # shutdown active clients
-        for client in self._clients:
-            client.shutdown(wait=True)
-        self._clients.clear()
-        logger.info('Disconnected clients.')
-
-        # shutdown active monitors
-        for monitor in self._monitors:
-            monitor.shutdown(wait=True)
-        self._monitors.clear()
-        logger.info('Disconnected monitors.')
-
-        # cleanup socket refs
-        self._client_sock = None
-        self._monitor_sock = None
-
-        logger.info('Shutting down server... DONE!')
-
-    def shutdown(self) -> None:
-        """Request server shutdown."""
-
-        self._shutdown = True
-
-        logger.info('Shutdown requested.')
-
-    def _listen_for_clients(self) -> None:
-        """Wait for incoming client connections.
-
-        Note: This method is executed by the client listener thread - don't call it independently!
-        """
-
-        if self._client_sock is None:
-            return
-
-        logger.info('Listening for client connections on %s:%d', self.host, self.client_port)
-        while not self._shutdown:
-            try:
-                sock, addr = self._client_sock.accept()
-            except Exception:  # noqa: BLE001
-                self._shutdown = True
-                break
-
-            logger.info('New client connection: %s.', addr)
-
-            conn = TCPLPMConnection(sock, addr)
-            client = RemoteSimClient(conn)
-
-            with self._mutex:
-                self._clients.append(client)
-
-        logger.info('Shutdown client listener thread.')
-        self._client_sock.close()
-
-    def _listen_for_monitors(self) -> None:
-        """Wait for incoming monitor connections.
-
-        Note: This method is executed by the monitor listener thread - don't call it independently!
-        """
-
-        if self._monitor_sock is None:
-            return
-
-        logger.info('Listening for monitor connections on %s:%d', self.host, self.monitor_port)
-        while not self._shutdown:
-            try:
-                sock, addr = self._monitor_sock.accept()
-            except Exception:  # noqa: BLE001
-                self._shutdown = True
-                break
-
-            logger.info('New monitor connection: %s.', addr)
-
-            conn = TCPLPMConnection(sock, addr)
-            monitor = RemoteSimMonitor(conn)
-
-            with self._mutex:
-                self._monitors.append(monitor)
-
-        logger.info('Shutdown monitor listener thread.')
-        self._monitor_sock.close()
-
-    def _run_simulation(self) -> None:
-        """Simulation main loop.
-
-        Note: This method is executed by the simulation thread - don't call it independently!
-        """
-
-        logger.info('Starting Simulation loop.')
-
-        # create simulation world
-        if not self._create_world(self.referee):
-            return
-
-        # create internal monitor
-        if self.render:
-            self._monitors.append(MujocoMonitor(self._mj_model, 2))
-
-        # run simulation update loop
-        if self.sequential_mode:
-            self._sequential_update_loop()
-        else:
-            self._parallel_update_loop()
-
-        logger.info('Simulation thread finished.')
-
-    def _filter_clients(self) -> tuple[list[SimClient], list[SimClient], list[SimClient], list[SimClient]]:
-        """Filter simulation clients by state.
-
-        Returns
-        -------
-        connected_clients: list[SimClient]
-            The list of clients in connected state.
-
-        ready_clients: list[SimClient]
-            The list of clients in ready state.
-
-        active_clients: list[SimClient]
-            The list of clients in active state.
-
-        disconnected_clients: list[SimClient]
-            The list of clients in disconnected state.
-        """
-
-        connected_clients: list[SimClient] = []
-        ready_clients: list[SimClient] = []
-        active_clients: list[SimClient] = []
-        disconnected_clients: list[SimClient] = []
-
-        with self._mutex:
-            for client in self._clients:
-                state = client.get_state()
-                if state == SimClientState.CONNECTED:
-                    connected_clients.append(client)
-                elif state == SimClientState.READY:
-                    ready_clients.append(client)
-                elif state == SimClientState.ACTIVE:
-                    active_clients.append(client)
-                # elif state == SimClientState.DISCONNECTED:
-                else:
-                    disconnected_clients.append(client)
-
-        return connected_clients, ready_clients, active_clients, disconnected_clients
-
-    def _filter_monitors(self) -> tuple[list[SimMonitor], list[SimMonitor]]:
-        """Filter simulation monitors by state.
-
-        Returns
-        -------
-        active_monitors: list[SimMonitor]
-            The list of active / connected monitors.
-
-        inactive_monitors: list[SimMonitor]
-            The list of inactive / disconnected monitors.
-        """
-
-        active_monitors: list[SimMonitor] = []
-        inactive_monitors: list[SimMonitor] = []
-
-        with self._mutex:
-            for monitor in self._monitors:
-                if monitor.get_state() == SimMonitorState.CONNECTED:
-                    active_monitors.append(monitor)
-                else:
-                    inactive_monitors.append(monitor)
-
-        return active_monitors, inactive_monitors
-
-    def _remove_clients(self, clients: list[SimClient], monitors: list[SimMonitor]) -> None:
-        """Remove the given lists of clients and monitors.
-
-        Parameter
-        ---------
-        clients: list[SimClient]
-            The list of clients to remove.
-
-        monitors: list[SimMonitor]
-            The list of monitors to remove.
-        """
-
-        with self._mutex:
-            for client in clients:
-                self._clients.remove(client)
-
-            for monitor in monitors:
-                self._monitors.remove(monitor)
-
-    def _parallel_update_loop(self) -> None:
-        """Parallel simulation update loop.
-
-        Note: This method is executed by the simulation thread - don't call it independently!
-        """
-
-        logger.info('Running a parallel simulation update loop.')
-
-        needs_recompile: bool = False
-        sim_timestep: float = self._mj_model.opt.timestep * self.n_substeps
-        cycle_start: float = time.time() - sim_timestep
-
-        # parallel simulation update loop
-        while not self._shutdown:
-            # filter clients / monitors by state, as their state may change during this simulation step
-            # this also simplifies client / monitor removal from the central client / monitor lists
-            _, ready_clients, active_clients, disconnected_clients = self._filter_clients()
-            active_monitors, monitors_to_remove = self._filter_monitors()
-
-            clients_to_remove: list[SimClient] = disconnected_clients.copy()
-            activated_clients: list[SimClient] = []
-
-            # handle disconnected clients
-            for client in disconnected_clients:
-                needs_recompile |= self._deactivate_client(client, self.referee)
-
-            # handle ready clients
-            for client in ready_clients:
-                if self._activate_client(client, self.referee):
-                    needs_recompile = True
-                    activated_clients.append(client)
-                else:
-                    # failed to activate client --> shutdown and remove client
-                    logger.info('Failed to activate player %s. Disconnecting again.', client)
-                    client.shutdown()
-                    clients_to_remove.append(client)
-
-            if needs_recompile:
-                self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
-                needs_recompile = False
-
-            if activated_clients:
-                # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
-                mujoco.mj_forward(self._mj_model, self._mj_data)
-
-            # generate perceptions
-            self._generate_perceptions(active_clients + activated_clients, self.referee)
-
-            # sleep to match simulation interval
-            if self.real_time:
-                time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
-                cycle_start = time.time()
-
-            # collect client actions
-            # Note: Actions need to be collected before sending perceptions to clients in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
-            client_actions = self._collect_actions(active_clients, block=self.sync_mode)
-
-            # send perceptions
-            self._send_perceptions(active_clients + activated_clients)
-
-            # collect monitor commands
-            monitor_commands = self._collect_commands(active_monitors)
-
-            # progress simulation
-            self._step(client_actions, monitor_commands, self.referee)
-
-            # update connected monitors
-            for monitor in active_monitors:
-                monitor.update(self._mj_model, self._mj_data, self._frame_id, self.referee.get_state())
-
-            # TODO: log monitor message to simulator log
-            # TODO: log client perceptions and actions to client logs
-
-            # remove disconnected clients and monitors
-            self._remove_clients(clients_to_remove, monitors_to_remove)
-
-    def _sequential_update_loop(self) -> None:
-        """Sequential simulation update loop.
-
-        Note: This method is executed by the simulation thread - don't call it independently!
-        """
-
-        logger.info('Running a sequential simulation update loop.')
-
-        needs_recompile: bool = False
-        sim_timestep: float = self._mj_model.opt.timestep * self.n_substeps
-        cycle_start: float = time.time() - sim_timestep
-
-        # sequential simulation update loop
-        while not self._shutdown:
-            # filter clients / monitors by state, as their state may change during this simulation step
-            # this also simplifies client / monitor removal from the central client / monitor lists
-            _, ready_clients, active_clients, disconnected_clients = self._filter_clients()
-            active_monitors, monitors_to_remove = self._filter_monitors()
-
-            clients_to_remove: list[SimClient] = disconnected_clients.copy()
-            activated_clients: list[SimClient] = []
-
-            # handle disconnected clients
-            for client in disconnected_clients:
-                needs_recompile |= self._deactivate_client(client, self.referee)
-
-            if needs_recompile:
-                self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
-                needs_recompile = False
-
-            # sleep to match simulation interval
-            if self.real_time:
-                time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
-                cycle_start = time.time()
-
-            # Note: Actions need to be collected before sending perceptions to clients in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
-            client_actions = self._collect_actions(active_clients, block=self.sync_mode)
-
-            # collect monitor commands
-            monitor_commands = self._collect_commands(active_monitors)
-
-            # progress simulation
-            self._step(client_actions, monitor_commands, self.referee)
-
-            # handle ready clients
-            for client in ready_clients:
-                if self._activate_client(client, self.referee):
-                    needs_recompile = True
-                    activated_clients.append(client)
-                    active_clients.append(client)
-                else:
-                    # failed to activate client --> shutdown and remove client
-                    logger.info('Failed to activate player %s. Disconnecting again.', client)
-                    client.shutdown()
-                    clients_to_remove.append(client)
-
-            if needs_recompile:
-                self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
-                needs_recompile = False
-
-            if activated_clients:
-                # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
-                mujoco.mj_forward(self._mj_model, self._mj_data)
-
-            # Note: In sequential mode, perceptions should ideally be sent directly after the simulation step to give the agents as much time as possible, while the server notifies monitors, etc.
-            self._generate_perceptions(active_clients, self.referee)
-            self._send_perceptions(active_clients)
-
-            # update connected monitors
-            for monitor in active_monitors:
-                monitor.update(self._mj_model, self._mj_data, self._frame_id, self.referee.get_state())
-
-            # TODO: log monitor message to simulator log
-            # TODO: log client perceptions and actions to client logs
-
-            # remove disconnected clients and monitors
-            self._remove_clients(clients_to_remove, monitors_to_remove)
-
-
-class ManagedSim(BaseSimulation):
-    """A simulation without the server component, running in sync with a single client, managed externally."""
-
-    def __init__(self, *, sequential_mode: bool = False) -> None:
-        """Construct a new managed simulation.
-
-        Parameter
-        ---------
-        sequential_mode: bool, default=False
-            Flag for selecting sequential or parallel simulation update loop.
-        """
-
-        super().__init__()
-
-        self._referee: SoccerReferee | None = None
-        """The game referee."""
-
-        self.sequential_mode: Final[bool] = sequential_mode
-        """Flag for enabling / disabling sequential mode."""
-
-        self._clients: Sequence[SimClient] = []
-        """The list of active clients."""
-
-        self._client_actions: Sequence[SimAction] = []
-        """The list of buffered client actions for the next simulation cycle."""
-
-    def get_client_timestep(self) -> float:
-        """Return the client timestep."""
-
-        return 0 if self.mj_model is None else self.mj_model.opt.timestep * self.n_substeps
-
-    def reset(self, clients: SimClient | Sequence[SimClient], referee: SoccerReferee) -> None:
-        """Reset the simulation for the given client and referee.
-
-        Parameter
-        ---------
-        clients: SimClient | Sequence[SimClient]
-            The (learning) client instance and possibly further clients executed synchronously with the simulation.
+        active_monitors: Sequence[SimMonitor]
+            The list of active monitors.
 
         referee: SoccerReferee
-            The referee to use for judging the game.
+            The referee instance.
         """
 
-        # shutdown existing clients
-        for client in self._clients:
-            client.shutdown()
+        for monitor in active_monitors:
+            monitor.update(self._mj_model, self._mj_data, self._frame_id, referee.get_state())
 
-        # reset simulation state
-        self._referee = referee
-        self._clients = clients if isinstance(clients, Sequence) else [clients]
-        self._client_actions = []
+    @abstractmethod
+    def _create_world(self) -> Any | None:
+        """(Re-)initialize the game and create a new simulation world environment."""
 
-        # create a new world
-        if not self._create_world(self._referee):
-            raise RuntimeError
-
-        # activate clients
-        for client in self._clients:
-            if not self._activate_client(client, self._referee):
-                raise RuntimeError
-
-        # compile modified spec
-        self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
-
-        # initialize sim data and client perceptions
-        self.forward()
-
-    def forward(self) -> None:
-        """
-        Recalculate forward kinematics / dynamics and regenerate agent perceptions.
-
-        This method does not perform a simulation step.
-        It only recalculates the forward kinematics / dynamics and regenerates agent perceptions accordingly.
-        Use it to refresh the simulator state after externally manipulating the mj_data array.
-        """
-
-        if self._referee is None or self._mj_data is None:
-            raise RuntimeError
-
-        # calculate forward kinematics / dynamics in case the use modified the data
-        mujoco.mj_forward(self._mj_model, self._mj_data)
-
-        # generate perceptions
-        self._generate_perceptions(self._clients, self._referee)
-
-    def step(self, commands: Sequence[MonitorCommand] = []) -> None:
-        """Perform a simulation step.
+    @abstractmethod
+    def _request_participation(self, agent: PAgent, model_spec: Any) -> AgentID | None:
+        """Validate and add a new agent requesting to join the game.
 
         Parameter
         ---------
-        commands: Sequence[MonitorCommand], default=[]
-            The sequence of monitor commands to forward to the referee for this simulation cycle.
+        agent: PAgent
+            The agent the requests participation in the game.
+
+        model_spec: MjSpec
+            The robot model specification of the new agent.
+
+        Returns
+        -------
+        AgentID | None
+            The agent id identifying the new agent if participation has been accepted, None if participation of the new agent has been rejected.
         """
 
-        if self._referee is None or self._mj_data is None:
-            raise RuntimeError
+    @abstractmethod
+    def _handle_withdrawal(self, agent_id: AgentID) -> None:
+        """Handle the withdrawal of an agent participating in the game.
 
-        # send perceptions
-        self._send_perceptions(self._clients)
+        Parameter
+        ---------
+        aid: AgentID
+            The id of the agent that withdrawed from the game.
+        """
 
-        if self.sequential_mode:
-            # collect actions from clients for current simulation cycle
-            self._client_actions = self._collect_actions(self._clients)
+    @abstractmethod
+    def _generate_game_state_perception(self) -> Perception:
+        """Generate a perception representing the current game state to participating players.
 
-        # progress simulation
-        self._step(self._client_actions, commands, self._referee)
-
-        # generate perceptions
-        self._generate_perceptions(self._clients, self._referee)
-
-        if not self.sequential_mode:
-            # buffer actions from clients for next simulation cycle
-            self._client_actions = self._collect_actions(self._clients)
+        Returns
+        -------
+        Perception
+            The game state perception.
+        """

@@ -8,7 +8,7 @@ from typing import Any
 from rcsssmj.communication.connection import PConnection
 from rcsssmj.game.game_state import GameState
 from rcsssmj.monitor.commands import MonitorCommand
-from rcsssmj.monitor.parser import CommandParser, SoccerCommandParser
+from rcsssmj.monitor.parser import CommandParser
 
 logger = logging.getLogger(__name__)
 
@@ -82,19 +82,22 @@ class SimMonitor(ABC):
 class RemoteSimMonitor(SimMonitor):
     """Remote simulation monitor, utilizing a message based connection to communicate with an external monitor process."""
 
-    def __init__(self, conn: PConnection) -> None:
+    def __init__(self, conn: PConnection, parser: CommandParser) -> None:
         """Construct a new remote simulation monitor client.
 
         Parameter
         ---------
         conn: PConnection
             The monitor connection.
+
+        parser: CommandParser
+            The monitor command parser instance.
         """
 
         super().__init__()
 
         self._conn: PConnection = conn
-        self._parser: CommandParser = SoccerCommandParser()
+        self._parser: CommandParser = parser
 
         self._receive_thread: Thread = Thread(target=self._receive_loop)
 
