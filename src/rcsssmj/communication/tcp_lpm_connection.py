@@ -6,9 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class TCPLPMConnection:
-    """
-    TCP/IP based connection for receiving and sending (typically 4-byte) length prefixed messages.
-    """
+    """TCP/IP based connection for receiving and sending (typically 4-byte) length prefixed messages."""
 
     def __init__(
         self,
@@ -16,33 +14,48 @@ class TCPLPMConnection:
         addr: socket.AddressInfo,
         length_prefix_size: int = 4,
     ) -> None:
-        """
-        Construct a new TCP/IP LPM connection.
+        """Construct a new TCP/IP LPM connection.
+
+        Parameter
+        ---------
+        sock: socket.socket
+            The TCP/IP socket.
+
+        addr: socket.AddressInfo
+            The socket address info.
+
+        length_prefix_size: int = 4
+            The size of the message length prefix.
         """
 
         self.sock: Final[socket.socket] = sock
+        """The TCP/IP socket."""
+
         self.addr: Final[socket.AddressInfo] = addr
+        """The socket address information."""
 
         self._active: bool = True
+        """Flag if the socket is active or not."""
 
         self.length_prefix_size: Final[int] = length_prefix_size
+        """The size (in number of bytes) of the message length prefix."""
+
         self._rcv_buffer_size = 1024
+        """The current total size of the receive buffer."""
+
         self._rcv_buffer = bytearray(self._rcv_buffer_size)
+        """Buffer for receiving messages."""
 
         # set TCP_NODELAY option to send messages immediately (without buffering)
         self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
     def is_active(self) -> bool:
-        """
-        Check if the connection is still active.
-        """
+        """Check if the connection is still active."""
 
         return self._active
 
     def send_message(self, msg: bytes | bytearray) -> None:
-        """
-        Send the given message.
-        """
+        """Send the given message."""
 
         if self._active:
             self.sock.send((len(msg)).to_bytes(self.length_prefix_size, byteorder='big') + msg)
@@ -75,9 +88,7 @@ class TCPLPMConnection:
         return self._rcv_buffer[:msg_size]
 
     def shutdown(self) -> None:
-        """
-        Shutdown / close this connection.
-        """
+        """Shutdown / close this connection."""
 
         self._active = False
 
@@ -88,11 +99,12 @@ class TCPLPMConnection:
             logger.debug('ERROR shutting down socket!', exc_info=True)
 
     def close(self) -> None:
-        """
-        Close this connection.
-        """
+        """Close this connection."""
 
         self._active = False
 
         # close and clear socket
         self.sock.close()
+
+    def __str__(self) -> str:
+        return str(self.addr)

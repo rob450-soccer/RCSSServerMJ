@@ -25,12 +25,12 @@ from rcsssmj.client.perception import (
     TouchPerception,
     VisionPerception,
 )
-from rcsssmj.client.sim_client import SimClient, SimClientState, TCPSimClient
+from rcsssmj.client.sim_client import RemoteSimClient, SimClient, SimClientState
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.game.referee import SoccerReferee
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
-from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState, TCPSimMonitor
+from rcsssmj.monitor.sim_monitor import RemoteSimMonitor, SimMonitor, SimMonitorState
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
 logger = logging.getLogger(__name__)
@@ -557,9 +557,7 @@ class SimServer(BaseSimulation):
         """Mutex for synchronizing simulation threads."""
 
     def run(self) -> None:
-        """
-        Run simulation server.
-        """
+        """Run simulation server."""
 
         if self._client_sock is not None or self._monitor_sock is not None:
             # a simulation is already running...
@@ -639,9 +637,7 @@ class SimServer(BaseSimulation):
         logger.info('Shutting down server... DONE!')
 
     def shutdown(self) -> None:
-        """
-        Request server shutdown.
-        """
+        """Request server shutdown."""
 
         self._shutdown = True
 
@@ -667,7 +663,7 @@ class SimServer(BaseSimulation):
             logger.info('New client connection: %s.', addr)
 
             conn = TCPLPMConnection(sock, addr)
-            client = TCPSimClient(conn)
+            client = RemoteSimClient(conn)
 
             with self._mutex:
                 self._clients.append(client)
@@ -695,7 +691,7 @@ class SimServer(BaseSimulation):
             logger.info('New monitor connection: %s.', addr)
 
             conn = TCPLPMConnection(sock, addr)
-            monitor = TCPSimMonitor(conn)
+            monitor = RemoteSimMonitor(conn)
 
             with self._mutex:
                 self._monitors.append(monitor)

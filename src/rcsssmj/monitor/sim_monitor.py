@@ -5,7 +5,7 @@ from queue import Queue
 from threading import Thread
 from typing import Any
 
-from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
+from rcsssmj.communication.connection import PConnection
 from rcsssmj.game.game_state import GameState
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import CommandParser, SExprCommandParser
@@ -79,21 +79,21 @@ class SimMonitor(ABC):
         """
 
 
-class TCPSimMonitor(SimMonitor):
-    """TCP connection based monitor client."""
+class RemoteSimMonitor(SimMonitor):
+    """Remote simulation monitor, utilizing a message based connection to communicate with an external monitor process."""
 
-    def __init__(self, conn: TCPLPMConnection) -> None:
-        """Construct a new monitor client representation.
+    def __init__(self, conn: PConnection) -> None:
+        """Construct a new remote simulation monitor client.
 
         Parameter
         ---------
-        conn: TCPLPMConnection
+        conn: PConnection
             The monitor connection.
         """
 
         super().__init__()
 
-        self._conn: TCPLPMConnection = conn
+        self._conn: PConnection = conn
         self._parser: CommandParser = SExprCommandParser()
 
         self._receive_thread: Thread = Thread(target=self._receive_loop)
@@ -119,7 +119,7 @@ class TCPSimMonitor(SimMonitor):
             try:
                 msg = self._conn.receive_message()
             except ConnectionError:
-                logger.debug('Monitor connection %s closed!', self._conn.addr)
+                logger.debug('Monitor connection %s closed!', self._conn)
                 break
 
             # parse commands
@@ -132,4 +132,4 @@ class TCPSimMonitor(SimMonitor):
         self._state = SimMonitorState.DISCONNECTED
         self._conn.close()
 
-        logger.debug('Monitor thread for %s finished!', self._conn.addr)
+        logger.debug('Monitor thread for %s finished!', self._conn)

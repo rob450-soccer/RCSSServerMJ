@@ -1,5 +1,4 @@
 import logging
-import socket
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum
@@ -12,7 +11,7 @@ from rcsssmj.client.action import SimAction
 from rcsssmj.client.encoder import PerceptionEncoder, SExprPerceptionEncoder
 from rcsssmj.client.parser import ActionParser, SExprActionParser
 from rcsssmj.client.perception import Perception
-from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
+from rcsssmj.communication.connection import PConnection
 
 logger = logging.getLogger(__name__)
 
@@ -52,16 +51,31 @@ class SimClient(ABC):
         """
 
         self._state: SimClientState = SimClientState.READY if len(model_name) > 0 and len(team_name) > 0 and player_no >= 0 else SimClientState.CONNECTED
+        """The client state."""
+
         self._model_name: str = model_name
+        """The name of the robot model used for this client."""
+
         self._team_name: str = team_name
+        """The name of the team the client belongs to."""
+
         self._player_no: int = player_no
+        """The player number."""
 
         self._agent_id: AgentID | None = None
+        """Unique identifier for the agent in the simulation associated with this client."""
+
         self._model_spec: Any | None = None
+        """The robot model specification."""
+
         self._model_markers: Sequence[tuple[str, str]] = []
+        """The visible markers of the robot model."""
 
         self._perceptions: Sequence[Perception] = []
+        """The current perceptions of the client."""
+
         self._action_queue: Queue[Sequence[SimAction]] = Queue()
+        """The queue to which incoming agent actions are forwarded."""
 
     def get_state(self) -> SimClientState:
         """Return the current client state."""
@@ -155,33 +169,34 @@ class SimClient(ABC):
         return f'SimClient({self._model_name}, {self._team_name}, {self._player_no})'
 
 
-class TCPSimClient(SimClient):
-    """TCP connection based simulation client."""
+class RemoteSimClient(SimClient):
+    """Remote simulation client, utilizing a message based connection to communicate with an external agent process."""
 
-    def __init__(self, conn: TCPLPMConnection) -> None:
-        """Construct a new TCP based client.
+    def __init__(self, conn: PConnection) -> None:
+        """Construct a new remote simulation client.
 
         Parameter
         ---------
-        conn: TCPLPMConnection
+        conn: PConnection
             The client connection.
         """
 
         super().__init__()
 
-        self._conn: TCPLPMConnection = conn
+        self._conn: PConnection = conn
+        """The client connection for exchanging perception and action messages."""
+
         self._parser: ActionParser = SExprActionParser()
+        """Parser for parsing incoming action messages."""
+
         self._encoder: PerceptionEncoder = SExprPerceptionEncoder()
+        """Encoder for encoding outgoing perception messages."""
 
         self._receive_thread: Thread = Thread(target=self._receive_loop)
+        """The receive thread, running the receive loop."""
 
         # start receive loop
         self._receive_thread.start()
-
-    def get_addr(self) -> socket.AddressInfo:
-        """Return the client address information."""
-
-        return self._conn.addr
 
     def shutdown(self, *, wait: bool = False) -> None:
         self._conn.shutdown()
@@ -216,7 +231,7 @@ class TCPSimClient(SimClient):
             try:
                 msg = self._conn.receive_message()
             except ConnectionError:
-                logger.debug('Client connection %s closed!', self._conn.addr)
+                logger.debug('Client connection %s closed!', self._conn)
                 break
 
             if self._state == SimClientState.CONNECTED:
@@ -224,7 +239,7 @@ class TCPSimClient(SimClient):
                 init_action = self._parser.parse_init(msg)
 
                 if init_action is None:
-                    logger.warning('Initialization for client %s failed! Disconnecting!', self._conn.addr)
+                    logger.warning('Initialization for client %s failed! Disconnecting!', self._conn)
                     self._conn.shutdown()
                     break
 
@@ -254,10 +269,10 @@ class TCPSimClient(SimClient):
         self._action_queue.put([])
         self._action_queue.put([])
 
-        logger.debug('Client thread for %s finished!', self._conn.addr)
+        logger.debug('Client thread for %s finished!', self._conn)
 
     def __str__(self) -> str:
-        return f'{self._team_name} #{self._player_no} @ {self._conn.addr}'
+        return f'{self._team_name} #{self._player_no} @ {self._conn}'
 
     def __repr__(self) -> str:
         return f'TCPSimClient({self._conn.__repr__()})'
