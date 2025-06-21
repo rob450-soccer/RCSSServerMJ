@@ -69,6 +69,16 @@ class SExpression(Sequence[Union[bytes, bytearray, 'SExpression']]):
         self._list.append(node)
         return node
 
+    def expressions(self) -> Iterator[SExpression]:
+        """Return an expression iterator, iterating over all sub-expressions of this expression."""
+
+        return (el for el in self._list if isinstance(el, SExpression))
+
+    def values(self) -> Iterator[bytes | bytearray]:
+        """Return an values iterator, iterating over all values of this expression."""
+
+        return (el for el in self._list if isinstance(el, bytes | bytearray))
+
     def get_expr(self, i: int) -> SExpression:
         """
         Return the value at the given index as symbolic expression.

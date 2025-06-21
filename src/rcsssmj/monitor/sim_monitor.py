@@ -8,7 +8,7 @@ from typing import Any
 from rcsssmj.communication.connection import PConnection
 from rcsssmj.game.game_state import GameState
 from rcsssmj.monitor.commands import MonitorCommand
-from rcsssmj.monitor.parser import CommandParser, SExprCommandParser
+from rcsssmj.monitor.parser import CommandParser, SoccerCommandParser
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class RemoteSimMonitor(SimMonitor):
         super().__init__()
 
         self._conn: PConnection = conn
-        self._parser: CommandParser = SExprCommandParser()
+        self._parser: CommandParser = SoccerCommandParser()
 
         self._receive_thread: Thread = Thread(target=self._receive_loop)
 

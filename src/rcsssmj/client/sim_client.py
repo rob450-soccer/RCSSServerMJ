@@ -8,8 +8,8 @@ from typing import Any, cast
 
 from rcsssmj.agent import AgentID
 from rcsssmj.client.action import SimAction
-from rcsssmj.client.encoder import PerceptionEncoder, SExprPerceptionEncoder
-from rcsssmj.client.parser import ActionParser, SExprActionParser
+from rcsssmj.client.encoder import PerceptionEncoder, DefaultPerceptionEncoder
+from rcsssmj.client.parser import ActionParser, SoccerActionParser
 from rcsssmj.client.perception import Perception
 from rcsssmj.communication.connection import PConnection
 
@@ -186,10 +186,10 @@ class RemoteSimClient(SimClient):
         self._conn: PConnection = conn
         """The client connection for exchanging perception and action messages."""
 
-        self._parser: ActionParser = SExprActionParser()
+        self._parser: ActionParser = SoccerActionParser()
         """Parser for parsing incoming action messages."""
 
-        self._encoder: PerceptionEncoder = SExprPerceptionEncoder()
+        self._encoder: PerceptionEncoder = DefaultPerceptionEncoder()
         """Encoder for encoding outgoing perception messages."""
 
         self._receive_thread: Thread = Thread(target=self._receive_loop)

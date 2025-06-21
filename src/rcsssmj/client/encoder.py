@@ -5,26 +5,18 @@ from rcsssmj.client.perception import Perception
 
 
 class PerceptionEncoder(ABC):
-    """
-    Base class for perception message encoders.
-    """
+    """Base class for perception message encoders."""
 
     @abstractmethod
     def encode(self, perceptions: Sequence[Perception]) -> bytes | bytearray | None:
-        """
-        Encode the given sequence of perceptions into a message.
-        """
+        """Encode the given sequence of perceptions into a message."""
 
 
-class SExprPerceptionEncoder(PerceptionEncoder):
-    """
-    Default symbolic expression perception message encoder implementation.
-    """
+class DefaultPerceptionEncoder(PerceptionEncoder):
+    """Default perception message encoder implementation based on symbolic expressions."""
 
     def encode(self, perceptions: Sequence[Perception]) -> bytes | bytearray | None:
-        """
-        Encode the given sequence of perceptions into a symbolic expression message.
-        """
+        """Encode the given sequence of perceptions into a symbolic expression message."""
 
         msg = ''.join([p.to_sexp() for p in perceptions])
 
