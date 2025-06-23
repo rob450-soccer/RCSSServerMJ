@@ -58,9 +58,9 @@ def soccer_sim() -> None:
 
     # create game referee
     soccer_field = create_soccer_field(args.field)
-    rule_book = create_soccer_rule_book(args.rules, soccer_field)
-    referee = SoccerReferee(rule_book)
-    sim = SoccerSimulation(referee)
+    rule_book = create_soccer_rule_book(args.rules)
+    referee = SoccerReferee()
+    sim = SoccerSimulation(soccer_field, rule_book, referee)
 
     # create server
     server = SimServer(sim, args.host, args.cport, args.mport, sequential_mode=args.sequential, sync_mode=args.sync, real_time=args.realtime, render=args.render)

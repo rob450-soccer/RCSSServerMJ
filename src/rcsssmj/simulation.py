@@ -28,10 +28,10 @@ from rcsssmj.client.perception import (
 )
 from rcsssmj.client.sim_client import RemoteSimClient, SimClient, SimClientState
 from rcsssmj.communication.connection import PConnection
-from rcsssmj.game.referee import SoccerReferee
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import CommandParser, DefaultCommandParser
 from rcsssmj.monitor.sim_monitor import RemoteSimMonitor, SimMonitor, SimMonitorState
+from rcsssmj.monitor.state import SceneGraph, SimStateInformation
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
 logger = logging.getLogger(__name__)
@@ -138,6 +138,17 @@ class BaseSimulation(ABC):
         """The mujoco simulation data array."""
 
         return self._mj_data
+
+    @property
+    def sim_time(self) -> float:
+        """The current simulation time."""
+
+        return 0.0 if self._mj_data is None else self._mj_data.time
+
+    def kill_sim(self) -> None:
+        """Kill the simulation (server)."""
+
+        # TODO: Implement some sort of kill-flag that can be evaluated in external components (mainly the sim server) to trigger a shutdown.
 
     def register_clients(self, *client_or_conns: SimClient | PConnection) -> None:
         """Register new clients with the simulation.
@@ -267,6 +278,12 @@ class BaseSimulation(ABC):
 
     def init(self) -> bool:
         """Initialize the game and create a new simulation world environment."""
+
+        # clear existing clients in case there are any to prevent memory leaks
+        with self._mutex:
+            for client in self._clients:
+                client.shutdown()
+            self._clients.clear()
 
         # initialize game and create game world environment
         self._mj_spec = self._create_world()
@@ -487,7 +504,7 @@ class BaseSimulation(ABC):
 
         return monitor_commands
 
-    def step(self, client_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand], referee: SoccerReferee) -> None:
+    def step(self, client_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand]) -> None:
         """Perform a simulation step.
 
         Parameter
@@ -497,27 +514,45 @@ class BaseSimulation(ABC):
 
         monitor_commands: Sequence[MonitorCommand]
             The list of monitor commands.
-
-        referee: SoccerReferee
-            The referee instance.
         """
 
-        # apply client actions
-        for action in client_actions:
-            action.perform(referee, self._mj_model, self._mj_data)
+        # pre-step hook
+        self._pre_step(client_actions)
 
         # progress simulation
         mujoco.mj_step(self._mj_model, self._mj_data, self.n_substeps)
 
-        # apply monitor commands
-        for command in monitor_commands:
-            command.perform(referee, self._mj_data)
-
-        # call referee to judge the current simulation state and progress the game state
-        referee.referee(self.mj_model, self._mj_data)
+        # post-step hook
+        self._post_step(monitor_commands)
 
         # increment frame id
         self._frame_id += 1
+
+    def _pre_step(self, client_actions: Sequence[SimAction]) -> None:
+        """Method executed right before a simulation step.
+
+        Parameter
+        ---------
+        client_actions: Sequence[SimAction]
+            The list of simulation actions.
+        """
+
+        # apply client actions
+        for action in client_actions:
+            action.perform(self)
+
+    def _post_step(self, monitor_commands: Sequence[MonitorCommand]) -> None:
+        """Method executed right after a simulation step.
+
+        Parameter
+        ---------
+        monitor_commands: Sequence[MonitorCommand]
+            The list of monitor commands.
+        """
+
+        # apply monitor commands
+        for command in monitor_commands:
+            command.perform(self)
 
     def generate_perceptions(self, active_clients: Sequence[SimClient], *, gen_vision: bool | None = None) -> None:
         """Generate perceptions for active clients.
@@ -672,7 +707,12 @@ class BaseSimulation(ABC):
         for client in active_clients:
             client.send_perceptions()
 
-    def update_monitors(self, active_monitors: Sequence[SimMonitor], referee: SoccerReferee) -> None:
+    def _generate_state_information(self) -> list[SimStateInformation]:
+        """Generate simulation state information for updating monitor instances."""
+
+        return [SceneGraph(self._mj_model, self._mj_data)]
+
+    def update_monitors(self, active_monitors: Sequence[SimMonitor]) -> None:
         """Update active monitors.
 
         Parameter
@@ -684,12 +724,20 @@ class BaseSimulation(ABC):
             The referee instance.
         """
 
+        state_info = self._generate_state_information()
+
         for monitor in active_monitors:
-            monitor.update(self._mj_model, self._mj_data, self._frame_id, referee.get_state())
+            monitor.update(state_info, self._frame_id)
 
     @abstractmethod
     def _create_world(self) -> Any | None:
-        """(Re-)initialize the game and create a new simulation world environment."""
+        """Create a new simulation world environment.
+
+        Returns
+        -------
+        MjSpec
+            The game specific simulation world / environment specification.
+        """
 
     @abstractmethod
     def _request_participation(self, agent: PAgent, model_spec: Any) -> AgentID | None:

@@ -27,6 +27,9 @@ class SoccerBall:
         self.last_contact: AgentID | None = None
         """The previous agent contact (updated after the active contact has changed / has been lost)."""
 
+        self.place_pos: tuple[float, float] | None = None
+        """The target position to place the ball (if a ball placement is requested by some referee command)."""
+
     def set_active_contact(self, contact: AgentID | None) -> None:
         """Set the currently active agent contact.
 
@@ -66,6 +69,7 @@ class SoccerBall:
         self.position = self.last_position
         self.active_contact = None
         self.last_contact = None
+        self.place_pos = None
 
     def update(self, mj_model: Any, mj_data: Any) -> None:
         """Update ball state.

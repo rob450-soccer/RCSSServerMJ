@@ -1,17 +1,18 @@
 import time
+from collections.abc import Sequence
 from itertools import cycle
 from typing import Any
 
 import glfw
 import mujoco
 
+from rcsssmj.monitor.state import SceneGraph, SimStateInformation, SoccerEnvironmentInformation, SoccerGameInformation
+
 try:
     from OpenGL import GL
 except ImportError:
     GL = None
 
-from rcsssmj.game.game_state import GameState
-from rcsssmj.game.soccer import TeamSide
 from rcsssmj.monitor.commands import DropBallCommand, KickOffCommand
 from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState
 
@@ -35,6 +36,8 @@ class MujocoMonitor(SimMonitor):
 
         self.model = model
         self.fps: float = 0.0
+
+        self.game_state: SoccerGameInformation | None = None
 
         self.button_left: bool = False
         self.button_right: bool = False
@@ -88,18 +91,36 @@ class MujocoMonitor(SimMonitor):
         glfw.poll_events()  # make sure there are no pending events, otherwise the window will just freeze and not close properly
         glfw.terminate()
 
-    def update(self, mj_model: Any, mj_data: Any, frame_id: int, game_state: GameState) -> None:
-        self.game_state = game_state
+    def update(self, state_info: Sequence[SimStateInformation], frame_id: int) -> None:
+        scene_graph = None
 
-        if self.model is not mj_model:
-            self.model = mj_model
+        # process state information
+        for info in state_info:
+            if isinstance(info, SoccerEnvironmentInformation):
+                # process environment information
+                pass
 
-            # recreate scene and context
-            self.scene = mujoco.MjvScene(self.model, 1000)
-            self.context = mujoco.MjrContext(self.model, mujoco.mjtFontScale(self.font_scale))
+            elif isinstance(info, SoccerGameInformation):
+                # buffer soccer game state information
+                self.game_state = info
 
-        if self.update_interval <= 1 or frame_id % self.update_interval == 0:
-            self.render(mj_data)
+            elif isinstance(info, SceneGraph):
+                # buffer scene graph info
+                scene_graph = info
+
+        # check for valid scene graph information
+        if scene_graph is not None:
+            # check for model change
+            if self.model is not scene_graph.mj_model:
+                self.model = scene_graph.mj_model
+
+                # recreate scene and context
+                self.scene = mujoco.MjvScene(self.model, 1000)
+                self.context = mujoco.MjrContext(self.model, mujoco.mjtFontScale(self.font_scale))
+
+            # render
+            if self.update_interval <= 1 or frame_id % self.update_interval == 0:
+                self.render(scene_graph.mj_data)
 
     def mouse_button(self, window: Any, button: Any, act: Any, mods: Any) -> None:
         """Update mouse button state."""
@@ -183,14 +204,13 @@ class MujocoMonitor(SimMonitor):
             max_team_str_len = 20
             max_score_str_len = 5
             max_time_str_len = 5
-            left_team_txt = self.game_state.get_team_name(TeamSide.LEFT) or 'Unknown'[:max_team_str_len]
-            score_text = f'{self.game_state.get_team_score(TeamSide.LEFT)}:{self.game_state.get_team_score(TeamSide.RIGHT)}'[:max_score_str_len]
-            right_team_txt = (self.game_state.get_team_name(TeamSide.RIGHT) or 'Unknown')[:max_team_str_len]
-            play_time = self.game_state.get_play_time()
-            mins = int(play_time // 60)
-            secs = int(play_time % 60)
+            left_team_txt = self.game_state.left_team or 'Unknown'[:max_team_str_len]
+            score_text = f'{self.game_state.left_score}:{self.game_state.right_score}'[:max_score_str_len]
+            right_team_txt = (self.game_state.right_team or 'Unknown')[:max_team_str_len]
+            mins = int(self.game_state.play_time // 60)
+            secs = int(self.game_state.play_time % 60)
             time_text = f'{mins:02d}:{secs:02d}'[:max_time_str_len]
-            play_mode_text = f'Playmode: {self.game_state.get_play_mode().value}'
+            play_mode_text = f'Playmode: {self.game_state.play_mode}'
 
             # fmt: off
             char_w    = 16

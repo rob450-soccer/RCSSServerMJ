@@ -3,11 +3,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from rcsssmj.game.field import SoccerField
-
 
 logger = logging.getLogger(__name__)
 
@@ -46,18 +41,18 @@ class SoccerRuleBooks(Enum):
         return SoccerRuleBooks.UNKNOWN
 
 
-def create_soccer_rule_book(name: str, field: SoccerField) -> SoccerRules:
+def create_soccer_rule_book(name: str) -> SoccerRules:
     """Create the soccer rule book for the given name."""
 
     name_id = SoccerRuleBooks.from_value(name)
 
     if name_id in (SoccerRuleBooks.SSIM_2025, SoccerRuleBooks.SSIM):
-        return SSim2025Rules(field)
+        return SSim2025Rules()
     if name_id in (SoccerRuleBooks.HL_ADULT_2025, SoccerRuleBooks.HL_ADULT):
-        return HLAdult2025Rules(field)
+        return HLAdult2025Rules()
 
     # cases: FIFA and UNKNOWN
-    return FIFASoccerRules(field)
+    return FIFASoccerRules()
 
 
 @dataclass(frozen=True)
@@ -66,9 +61,6 @@ class SoccerRules:
 
     Note: Use default values from official FIFA rule book if there exists an equivalent rule. In all other cases try to choose sensible values which work in conjunction with the official FIFA rule book.
     """
-
-    field: SoccerField
-    """The soccer field specification."""
 
     max_team_size: int = 11  # officially 11 vs. 11 players
     """The maximum number of players per team."""
@@ -101,10 +93,10 @@ class SoccerRules:
     """The time (in seconds) the direct-free-kick team has exclusive access to the ball."""
 
     goal_pause_time: int = 3  # unofficial
-    """The time (in seconds) to "pause" the game after a goal before switching to kick-off playmode for the oppsosite team."""
+    """The time (in seconds) to "pause" the game after a goal before switching to kick-off play mode for the opposite team."""
 
     throwin_wait_time: int = 1  # unofficial
-    """The time (in seconds) to referee will wait after the ball left the field before switching to throw-in playmode."""
+    """The time (in seconds) to referee will wait after the ball left the field before switching to throw-in play mode."""
 
 
 @dataclass(frozen=True)
@@ -116,17 +108,10 @@ class FIFASoccerRules(SoccerRules):
 class SSim2025Rules(SoccerRules):
     """2025 version of the official RoboCup Soccer Simulation League rule book."""
 
-    def __init__(self, field: SoccerField) -> None:
-        """Construct a new RCSSim 2025 rule book.
-
-        Parameter
-        ---------
-        field : SoccerField
-            The soccer field specification.
-        """
+    def __init__(self) -> None:
+        """Construct a new RCSSim 2025 rule book."""
 
         super().__init__(
-            field=field,
             half_time=5 * 60,
             extra_half_time=3 * 60,
         )
@@ -136,17 +121,10 @@ class SSim2025Rules(SoccerRules):
 class HLAdult2025Rules(SoccerRules):
     """2025 version of the official RoboCup Humanoid Adult Size League rule book."""
 
-    def __init__(self, field: SoccerField) -> None:
-        """Construct a new RCHL-Adult 2025 rule book.
-
-        Parameter
-        ---------
-        field : SoccerField
-            The soccer field specification.
-        """
+    def __init__(self) -> None:
+        """Construct a new RCHL-Adult 2025 rule book."""
 
         super().__init__(
-            field=field,
             half_time=10 * 60,
             extra_half_time=5 * 60,
         )

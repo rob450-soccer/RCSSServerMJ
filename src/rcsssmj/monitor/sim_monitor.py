@@ -1,14 +1,14 @@
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from enum import Enum
 from queue import Queue
 from threading import Thread
-from typing import Any
 
 from rcsssmj.communication.connection import PConnection
-from rcsssmj.game.game_state import GameState
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import CommandParser
+from rcsssmj.monitor.state import SimStateInformation
 
 logger = logging.getLogger(__name__)
 
@@ -60,22 +60,16 @@ class SimMonitor(ABC):
         self._state = SimMonitorState.DISCONNECTED
 
     @abstractmethod
-    def update(self, mj_model: Any, mj_data: Any, frame_id: int, game_state: GameState) -> None:
+    def update(self, state_info: Sequence[SimStateInformation], frame_id: int) -> None:
         """Update the monitor state.
 
         Parameter
         ---------
-        mj_model: MjModel
-            The current simulation model.
-
-        mj_data: MjData
-            The current simulation data.
+        state_info: Sequence[SimStateInformation]
+            The list of simulation state information.
 
         frame_id: int
             The current simulation frame id.
-
-        game_state: GameState
-            The current game state.
         """
 
 
@@ -110,8 +104,8 @@ class RemoteSimMonitor(SimMonitor):
         if wait:
             self._receive_thread.join()
 
-    def update(self, mj_model: Any, mj_data: Any, frame_id: int, game_state: GameState) -> None:
-        # TODO: Generate and send simulation state message to monitor
+    def update(self, state_info: Sequence[SimStateInformation], frame_id: int) -> None:
+        # TODO: Send simulation state message to monitor
         pass
 
     def _receive_loop(self) -> None:

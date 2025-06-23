@@ -19,6 +19,21 @@ class GameState:
 
         self._play_mode_history_ms: dict[PlayMode, float] = {pm: 0 for pm in PlayMode}
 
+    def reset(self) -> None:
+        """Reinitialize game state."""
+
+        self._sim_time = 0.0
+        self._play_time_ms = 0
+        self._play_mode = PlayMode.BEFORE_KICK_OFF
+
+        self._left_team_name = None
+        self._right_team_name = None
+
+        self._left_team_score = 0
+        self._right_team_score = 0
+
+        self._play_mode_history_ms = {pm: 0 for pm in PlayMode}
+
     def get_sim_time(self) -> float:
         """Return the current simulation time."""
 

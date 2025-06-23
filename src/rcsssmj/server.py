@@ -5,8 +5,8 @@ from threading import Thread
 from typing import Final
 
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
-from rcsssmj.game.simulation import SoccerSimulation
 from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
+from rcsssmj.simulation import BaseSimulation
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class SimServer:
 
     def __init__(
         self,
-        sim: SoccerSimulation,
+        sim: BaseSimulation,
         host: str = '127.0.0.1',
         client_port: int = 60000,
         monitor_port: int = 60001,
@@ -74,7 +74,7 @@ class SimServer:
 
         super().__init__()
 
-        self.sim: Final[SoccerSimulation] = sim
+        self.sim: Final[BaseSimulation] = sim
         """The simulation to run."""
 
         self.host: Final[str] = host
@@ -303,10 +303,10 @@ class SimServer:
             monitor_commands = self.sim.collect_commands(active_monitors)
 
             # progress simulation
-            self.sim.step(client_actions, monitor_commands, self.sim.referee)
+            self.sim.step(client_actions, monitor_commands)
 
             # update connected monitors
-            self.sim.update_monitors(active_monitors, self.sim.referee)
+            self.sim.update_monitors(active_monitors)
 
             # TODO: log monitor message to simulator log
             # TODO: log client perceptions and actions to client logs
@@ -348,7 +348,7 @@ class SimServer:
             monitor_commands = self.sim.collect_commands(active_monitors)
 
             # progress simulation
-            self.sim.step(client_actions, monitor_commands, self.sim.referee)
+            self.sim.step(client_actions, monitor_commands)
 
             # handle ready clients
             activated_clients, deactivated_clients = self.sim.activate_clients(ready_clients)
@@ -359,7 +359,7 @@ class SimServer:
             self.sim.send_perceptions(active_clients)
 
             # update connected monitors
-            self.sim.update_monitors(active_monitors, self.sim.referee)
+            self.sim.update_monitors(active_monitors)
 
             # TODO: log monitor message to simulator log
             # TODO: log client perceptions and actions to client logs

@@ -1,7 +1,11 @@
+import logging
 from abc import ABC, abstractmethod
-from typing import Any, Final
+from typing import Final
 
-from rcsssmj.game.referee import SoccerReferee
+from rcsssmj.game.soccer_sim_interfaces import PSoccerSimActionInterface
+from rcsssmj.simulation_interfaces import PSimActionInterface
+
+logger = logging.getLogger(__name__)
 
 
 class InitRequest:
@@ -52,21 +56,16 @@ class SimAction(ABC):
         super().__init__()
 
         self.actuator_name: Final[str] = actuator_name
+        """The name of the actuator."""
 
     @abstractmethod
-    def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
+    def perform(self, ai: PSimActionInterface) -> None:
         """Perform this action.
 
         Parameter
         ---------
-        referee: SoccerReferee
-            The soccer referee instance.
-
-        mj_model: MjModel
-            The mujoco model.
-
-        mj_data: MjData
-            The mujoco data array.
+        ai: PSimActionInterface
+            The simulation action interface.
         """
 
 
@@ -101,20 +100,27 @@ class MotorAction(SimAction):
         super().__init__(actuator_name)
 
         self.q: Final[float] = q
+        """The target position of the actuator."""
+
         self.dq: Final[float] = dq
+        """The target velocity of the actuator."""
+
         self.kp: Final[float] = kp
+        """The proportional gain of the actuator."""
+
         self.kd: Final[float] = kd
+        """The derivative gain of the actuator."""
+
         self.tau: Final[float] = tau
+        """The extra torque of the actuator."""
 
-    def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
-        del referee  # signal unused parameter
-
-        actuator_tau_model = mj_model.actuator(self.actuator_name + '_tau')
-        actuator_tau_data = mj_data.actuator(self.actuator_name + '_tau')
-        actuator_pos_model = mj_model.actuator(self.actuator_name + '_pos')
-        actuator_pos_data = mj_data.actuator(self.actuator_name + '_pos')
-        actuator_vel_model = mj_model.actuator(self.actuator_name + '_vel')
-        actuator_vel_data = mj_data.actuator(self.actuator_name + '_vel')
+    def perform(self, ai: PSimActionInterface) -> None:
+        actuator_tau_model = ai.mj_model.actuator(self.actuator_name + '_tau')
+        actuator_tau_data = ai.mj_data.actuator(self.actuator_name + '_tau')
+        actuator_pos_model = ai.mj_model.actuator(self.actuator_name + '_pos')
+        actuator_pos_data = ai.mj_data.actuator(self.actuator_name + '_pos')
+        actuator_vel_model = ai.mj_model.actuator(self.actuator_name + '_vel')
+        actuator_vel_data = ai.mj_data.actuator(self.actuator_name + '_vel')
         if actuator_tau_model is not None:
             actuator_tau_data.ctrl = self.tau
             actuator_pos_data.ctrl = self.q
@@ -125,7 +131,38 @@ class MotorAction(SimAction):
             actuator_vel_model.biasprm[2] = -self.kd
 
 
-class BeamAction(SimAction):
+class SoccerSimAction(SimAction):
+    """Base class for soccer simulation actions."""
+
+    def __init__(self, actuator_name: str) -> None:
+        """Construct a new soccer simulation action.
+
+        Parameter
+        ---------
+        actuator_name : str
+            The name of the actuator to which this action applies.
+        """
+
+        super().__init__(actuator_name)
+
+    def perform(self, ai: PSimActionInterface) -> None:
+        if isinstance(ai, PSoccerSimActionInterface):
+            self._perform(ai)
+        else:
+            logger.warning('Expected soccer simulation action interface instance in soccer simulation action!')
+
+    @abstractmethod
+    def _perform(self, sai: PSoccerSimActionInterface) -> None:
+        """Perform this action.
+
+        Parameter
+        ---------
+        sai: PSoccerSimActionInterface
+            The soccer simulation action interface.
+        """
+
+
+class BeamAction(SoccerSimAction):
     """Class for representing a beam action."""
 
     def __init__(self, actuator_name: str, target_pose: tuple[float, float, float]):
@@ -143,25 +180,32 @@ class BeamAction(SimAction):
         super().__init__(actuator_name)
 
         self.target_pose: Final[tuple[float, float, float]] = target_pose
+        """The desired target 2D beam pose [x, y, theta]"""
 
-    def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
-        referee.beam_agent(self.actuator_name, mj_model, mj_data, self.target_pose)
+    def _perform(self, sai: PSoccerSimActionInterface) -> None:
+        sai.beam_agent(self.actuator_name, self.target_pose)
 
 
-class SayAction(SimAction):
-    """
-    Class for representing a say action.
-    """
+class SayAction(SoccerSimAction):
+    """Class for representing a say action."""
 
     def __init__(self, actuator_name: str, message: str):
-        """
-        Construct a new say action.
+        """Construct a new say action.
+
+        Parameter
+        ---------
+        actuator_name: str
+            The name of the beam effector.
+
+        message: str
+            The message to say.
         """
 
         super().__init__(actuator_name)
 
         self.message: Final[str] = message
+        """The message to say."""
 
-    def perform(self, referee: SoccerReferee, mj_model: Any, mj_data: Any) -> None:
+    def _perform(self, sai: PSoccerSimActionInterface) -> None:
         # TODO: implement audio logic
         pass
