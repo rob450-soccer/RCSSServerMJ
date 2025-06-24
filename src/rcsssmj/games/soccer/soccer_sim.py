@@ -7,18 +7,20 @@ from typing import Any, Final
 import mujoco
 
 from rcsssmj.agent import AgentID, PAgent
-from rcsssmj.client.parser import SoccerActionParser
-from rcsssmj.client.perception import GameStatePerception, Perception
+from rcsssmj.client.perception import Perception
+from rcsssmj.games.soccer.client.parser import SoccerActionParser
+from rcsssmj.games.soccer.client.perception import GameStatePerception
 from rcsssmj.games.soccer.field import SoccerField
 from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
 from rcsssmj.games.soccer.game_state import GameState
+from rcsssmj.games.soccer.monitor.parser import SoccerCommandParser
+from rcsssmj.games.soccer.monitor.state import SoccerEnvironmentInformation, SoccerGameInformation
 from rcsssmj.games.soccer.referee import SoccerReferee
 from rcsssmj.games.soccer.rules import FIFASoccerRules, SoccerRules
 from rcsssmj.games.teams import TeamSide
 from rcsssmj.mjutils import place_robot_3d, quat_from_axis_angle
 from rcsssmj.monitor.commands import MonitorCommand
-from rcsssmj.monitor.parser import SoccerCommandParser
-from rcsssmj.monitor.state import SimStateInformation, SoccerEnvironmentInformation, SoccerGameInformation
+from rcsssmj.monitor.state import SimStateInformation
 from rcsssmj.simulation import BaseSimulation
 
 logger = logging.getLogger(__name__)

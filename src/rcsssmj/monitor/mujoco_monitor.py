@@ -6,15 +6,15 @@ from typing import Any
 import glfw
 import mujoco
 
-from rcsssmj.monitor.state import SceneGraph, SimStateInformation, SoccerEnvironmentInformation, SoccerGameInformation
+from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand
+from rcsssmj.games.soccer.monitor.state import SoccerEnvironmentInformation, SoccerGameInformation
+from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState
+from rcsssmj.monitor.state import SceneGraph, SimStateInformation
 
 try:
     from OpenGL import GL
 except ImportError:
     GL = None
-
-from rcsssmj.monitor.commands import DropBallCommand, KickOffCommand
-from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState
 
 
 class MujocoMonitor(SimMonitor):
