@@ -1,20 +1,12 @@
 from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
-from rcsssmj.game.field import SoccerField
-from rcsssmj.game.game_object import SoccerBall, SoccerPlayer
-from rcsssmj.game.game_state import GameState
-from rcsssmj.game.rules import SoccerRules
-from rcsssmj.game.soccer import TeamSide
-
-
-@runtime_checkable
-class PGame(Protocol):
-    """Protocol for a game."""
-
-    @property
-    def sim_time(self) -> float:
-        """The current simulation time."""
+from rcsssmj.games.game import PGame
+from rcsssmj.games.soccer.field import SoccerField
+from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
+from rcsssmj.games.soccer.game_state import GameState
+from rcsssmj.games.soccer.rules import SoccerRules
+from rcsssmj.games.teams import TeamSide
 
 
 @runtime_checkable

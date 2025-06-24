@@ -1,8 +1,9 @@
 import logging
 from typing import TYPE_CHECKING, cast
 
-from rcsssmj.game.game import PSoccerGame
-from rcsssmj.game.soccer import PlayMode, TeamSide
+from rcsssmj.games.soccer.game import PSoccerGame
+from rcsssmj.games.soccer.play_mode import PlayMode
+from rcsssmj.games.teams import TeamSide
 
 if TYPE_CHECKING:
     from rcsssmj.agent import AgentID

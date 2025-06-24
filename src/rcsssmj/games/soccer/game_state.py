@@ -1,4 +1,5 @@
-from rcsssmj.game.soccer import PlayMode, TeamSide
+from rcsssmj.games.soccer.play_mode import PlayMode
+from rcsssmj.games.teams import TeamSide
 
 
 class GameState:

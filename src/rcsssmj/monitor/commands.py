@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Final
 
-from rcsssmj.game.soccer_sim_interfaces import PSoccerSimCommandInterface
+from rcsssmj.games.soccer.soccer_sim_interfaces import PSoccerSimCommandInterface
 from rcsssmj.simulation_interfaces import PSimCommandInterface
 
 logger = logging.getLogger(__name__)

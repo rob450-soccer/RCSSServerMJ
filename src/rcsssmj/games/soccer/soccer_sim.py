@@ -9,12 +9,12 @@ import mujoco
 from rcsssmj.agent import AgentID, PAgent
 from rcsssmj.client.parser import SoccerActionParser
 from rcsssmj.client.perception import GameStatePerception, Perception
-from rcsssmj.game.field import SoccerField
-from rcsssmj.game.game_object import SoccerBall, SoccerPlayer
-from rcsssmj.game.game_state import GameState
-from rcsssmj.game.referee import SoccerReferee
-from rcsssmj.game.rules import FIFASoccerRules, SoccerRules
-from rcsssmj.game.soccer import TeamSide
+from rcsssmj.games.soccer.field import SoccerField
+from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
+from rcsssmj.games.soccer.game_state import GameState
+from rcsssmj.games.soccer.referee import SoccerReferee
+from rcsssmj.games.soccer.rules import FIFASoccerRules, SoccerRules
+from rcsssmj.games.teams import TeamSide
 from rcsssmj.mjutils import place_robot_3d, quat_from_axis_angle
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import SoccerCommandParser

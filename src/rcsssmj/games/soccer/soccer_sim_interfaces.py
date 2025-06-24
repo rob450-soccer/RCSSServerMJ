@@ -1,6 +1,6 @@
 from typing import Protocol, runtime_checkable
 
-from rcsssmj.game.soccer import TeamSide
+from rcsssmj.games.teams import TeamSide
 from rcsssmj.simulation_interfaces import PSimActionInterface, PSimCommandInterface
 
 

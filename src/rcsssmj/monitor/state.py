@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Final
 
-from rcsssmj.game.field import SoccerField
-from rcsssmj.game.rules import SoccerRules
+from rcsssmj.games.soccer.field import SoccerField
+from rcsssmj.games.soccer.rules import SoccerRules
 
 
 class SimStateInformation(ABC):
