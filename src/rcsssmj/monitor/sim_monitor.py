@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 class SimMonitorState(Enum):
     """Simulation monitor state enum."""
 
-    CONNECTED = 'connected'
-    """The monitor is connected and active."""
+    ACTIVE = 'active'
+    """The monitor is actively receiving simulation state messages and can issue commands."""
 
-    DISCONNECTED = 'disconnected'
-    """The monitor is disconnected and waiting to be removed from the simulation."""
+    SHUTDOWN = 'shutdown'
+    """The monitor has been shut down and is waiting to be removed from the simulation server."""
 
 
 class SimMonitor(ABC):
@@ -29,7 +29,7 @@ class SimMonitor(ABC):
     def __init__(self, update_interval: int = 1):
         super().__init__()
 
-        self._state: SimMonitorState = SimMonitorState.CONNECTED
+        self._state: SimMonitorState = SimMonitorState.ACTIVE
         """The current simulation monitor state."""
 
         self.update_interval: int = update_interval
@@ -57,7 +57,7 @@ class SimMonitor(ABC):
             True, if the calling thread should be blocked until the monitor has finished its shutdown process, false if not.
         """
 
-        self._state = SimMonitorState.DISCONNECTED
+        self._state = SimMonitorState.SHUTDOWN
 
     @abstractmethod
     def update(self, state_info: Sequence[SimStateInformation], frame_id: int) -> None:
@@ -126,7 +126,7 @@ class RemoteSimMonitor(SimMonitor):
             for command in commands:
                 self._command_queue.put(command)
 
-        self._state = SimMonitorState.DISCONNECTED
+        self._state = SimMonitorState.SHUTDOWN
         self._conn.close()
 
         logger.debug('Monitor thread for %s finished!', self._conn)

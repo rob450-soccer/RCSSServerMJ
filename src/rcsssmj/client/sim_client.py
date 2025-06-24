@@ -19,17 +19,17 @@ logger = logging.getLogger(__name__)
 class SimClientState(Enum):
     """Simulation client state enum."""
 
-    CONNECTED = 'connected'
-    """The client is connected, but has not yet received sufficient initialization information."""
+    INIT = 'init'
+    """The client has been added to the simulation server, but can not yet provide sufficient initialization information."""
 
     READY = 'ready'
     """The client is ready for integration into the simulation."""
 
     ACTIVE = 'active'
-    """The client is actively receiving actions from a connected agent."""
+    """The client is actively receiving actions from a connected agent within the simulation."""
 
-    DISCONNECTED = 'disconnected'
-    """The client is disconnected and waiting to be removed from the simulation."""
+    SHUTDOWN = 'shutdown'
+    """The client has been shut down and is waiting to be removed from the simulation server."""
 
 
 class SimClient(ABC):
@@ -50,7 +50,7 @@ class SimClient(ABC):
             The client player number.
         """
 
-        self._state: SimClientState = SimClientState.READY if len(model_name) > 0 and len(team_name) > 0 and player_no >= 0 else SimClientState.CONNECTED
+        self._state: SimClientState = SimClientState.READY if len(model_name) > 0 and len(team_name) > 0 and player_no >= 0 else SimClientState.INIT
         """The client state."""
 
         self._model_name: str = model_name
@@ -139,7 +139,7 @@ class SimClient(ABC):
             True, if the calling thread should be blocked until the client has finished its shutdown process, false if not.
         """
 
-        self._state = SimClientState.DISCONNECTED
+        self._state = SimClientState.SHUTDOWN
 
     def set_perceptions(self, perceptions: Sequence[Perception]) -> None:
         """Set the perceptions of the agent for this simulation cycle.
@@ -240,8 +240,8 @@ class RemoteSimClient(SimClient):
                 logger.debug('Client connection %s closed!', self._conn)
                 break
 
-            if self._state == SimClientState.CONNECTED:
-                # client is in CONNECTED state -> process initialization message
+            if self._state == SimClientState.INIT:
+                # client is in INIT state -> process initialization message
                 init_action = self._parser.parse_init(msg)
 
                 if init_action is None:
@@ -265,10 +265,10 @@ class RemoteSimClient(SimClient):
                 self._action_queue.put(actions)
 
             else:
-                # client is in READY or DISCONNECTED state -> we don't expect any messages from the client in these states
+                # client is in READY or SHUTDOWN state -> we don't expect any messages from the client in these states
                 pass
 
-        self._state = SimClientState.DISCONNECTED
+        self._state = SimClientState.SHUTDOWN
         self._conn.close()
 
         # add a dummy action to prevent possible timeout in sync-mode (one should be enough, but two don't hurt either)

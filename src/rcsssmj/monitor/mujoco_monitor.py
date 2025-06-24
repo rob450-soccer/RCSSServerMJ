@@ -179,7 +179,7 @@ class MujocoMonitor(SimMonitor):
     def render(self, data: Any) -> None:
         """Render function."""
 
-        if self._state == SimMonitorState.DISCONNECTED:
+        if self._state == SimMonitorState.SHUTDOWN:
             # prevent rendering after shutdown
             return
 

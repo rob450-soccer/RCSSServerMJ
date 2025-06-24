@@ -240,7 +240,7 @@ class BaseSimulation(ABC):
         with self._mutex:
             for client in self._clients:
                 state = client.get_state()
-                if state == SimClientState.CONNECTED:
+                if state == SimClientState.INIT:
                     connected_clients.append(client)
                 elif state == SimClientState.READY:
                     ready_clients.append(client)
@@ -269,7 +269,7 @@ class BaseSimulation(ABC):
 
         with self._mutex:
             for monitor in self._monitors:
-                if monitor.get_state() == SimMonitorState.CONNECTED:
+                if monitor.get_state() == SimMonitorState.ACTIVE:
                     active_monitors.append(monitor)
                 else:
                     inactive_monitors.append(monitor)
