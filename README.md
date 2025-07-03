@@ -2,7 +2,7 @@
 
 The RoboCup Soccer Simulation Server based on the MuJoCo physics engine.
 
-![Simulation Screenshot](screenshot.png)
+![Soccer Simulation Screenshot](doc/source/_static/img/screenshot-T1.png)
 
 Video: [https://youtu.be/iYWw7vATQU4](https://youtu.be/iYWw7vATQU4)
 
