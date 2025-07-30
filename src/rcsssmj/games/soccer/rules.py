@@ -4,6 +4,8 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
+from rcsssmj.games.soccer.field import SoccerFieldVersions
+
 logger = logging.getLogger(__name__)
 
 
@@ -98,6 +100,9 @@ class SoccerRules:
     throwin_wait_time: int = 1  # unofficial
     """The time (in seconds) to referee will wait after the ball left the field before switching to throw-in play mode."""
 
+    default_field_version: SoccerFieldVersions = SoccerFieldVersions.FIFA  # official
+    """The default field version to use with the rule book."""
+
 
 @dataclass(frozen=True)
 class FIFASoccerRules(SoccerRules):
@@ -127,4 +132,5 @@ class HLAdult2025Rules(SoccerRules):
         super().__init__(
             half_time=10 * 60,
             extra_half_time=5 * 60,
+            default_field_version=SoccerFieldVersions.HL_ADULT_2020,
         )

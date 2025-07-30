@@ -50,15 +50,17 @@ def soccer_sim() -> None:
     parser.add_argument('-v', '--render',     help='Start internal monitor viewer.',      default=True,        action='store_true')
 
     # game arguments
-    parser.add_argument('-f', '--field',      help='The soccer field version.',           default=SoccerFieldVersions.FIFA.value, type=str, choices=field_versions)
+    parser.add_argument('-f', '--field',      help='The soccer field version.',                                type=str, choices=field_versions)
     parser.add_argument('-b', '--rules',      help='The soccer rule book.',               default=SoccerRuleBooks.FIFA.value, type=str, choices=rule_books)
     # fmt: on
 
     args = parser.parse_args()
 
     # create game referee
-    soccer_field = create_soccer_field(args.field)
     rule_book = create_soccer_rule_book(args.rules)
+    if args.field is None:
+        args.field = rule_book.default_field_version
+    soccer_field = create_soccer_field(args.field)
     referee = SoccerReferee()
     sim = SoccerSimulation(soccer_field, rule_book, referee)
 
