@@ -98,7 +98,8 @@ class SetPlayModeCommand(SoccerMonitorCommand):
 class MovePlayerCommand(SoccerMonitorCommand):
     """The command to move or rotate a player """
 
-    def __init__(self, player_id: int, team_name: str, pos: tuple[float, float, float]) -> None:
+    def __init__(self, player_id: int, team_name: str, pos: tuple[float, float, float],
+                 quat: tuple[float, float, float, float] | None = None) -> None:
         """Construct a new move-player command.
 
         Parameter
@@ -107,8 +108,10 @@ class MovePlayerCommand(SoccerMonitorCommand):
             The unique id of the player in its team
         team_name: str
             The name of the team the player plays in or "Left" or "Right" for the left or the right team
-        pos: tuple[float, float] | None, default=None
+        pos: tuple[float, float, float]
             The position to which to move the player.
+        quat: tuple[float, float, float, float], default = None
+            The 3D rotation quaternion of the torso
         """
 
         super().__init__()
@@ -116,9 +119,10 @@ class MovePlayerCommand(SoccerMonitorCommand):
         self.player_id = player_id
         self.team_name = team_name
         self.pos: Final[tuple[float, float, float]] = pos
+        self.quat: Final[tuple[float, float, float, float] | None] = quat
 
     def _perform(self, sci: PSoccerSimCommandInterface) -> None:
-        sci.request_move_player(self.player_id, self.team_name, self.pos)
+        sci.request_move_player(self.player_id, self.team_name, self.pos, self.quat)
         # logger.info('[COMMAND] "move player %d of team %s to %s"', self.player_id, self.team_name, self.pos)
 
 

@@ -6,6 +6,7 @@ from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import DefaultCommandParser
 from rcsssmj.utils.sexpression import SExpression
+from rcsssmj.mjutils import quat_from_axis_angle
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +46,14 @@ class SoccerCommandParser(DefaultCommandParser):
             return DropBallCommand(pos)
 
         if node[0] == b'agent':
-            # place agent command: (agent (unum <player_number>) (team <team_name>) (pos <x> <y> <z>))
-            # alternative command: (agent (unum <player_number>) (team <team_name>) (move <x> <y> <z> <theta>))
+            # place agent: (agent (unum <player_number>) (team <team_name>) (pos <x> <y> <z>))
+            # alternative: (agent (unum <player_number>) (team <team_name>) (move <x> <y> <z> <theta>))
+            # alternative: (agent (unum <player_number>) (team <team_name>) (rot <x> <y> <z> <q0> <q1> <q2> <q3>))
+
             player_id = 0
             team_name = ""
             pos3d: tuple[float, float, float] = (0, 0, 0)
+            quat: tuple[float, float, float, float] | None = None
             have_pos = False
             for sub_node in node:
                 if isinstance(sub_node, SExpression) and sub_node[0] == b'unum':
@@ -59,9 +63,18 @@ class SoccerCommandParser(DefaultCommandParser):
                 if isinstance(sub_node, SExpression) and sub_node[0] == b'pos':
                     pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
                     have_pos = True
+                if isinstance(sub_node, SExpression) and sub_node[0] == b'move':
+                    pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
+                    theta = sub_node.get_float(4)
+                    quat = quat_from_axis_angle((0, 0, 1), theta)
+                    have_pos = True
+                if isinstance(sub_node, SExpression) and sub_node[0] == b'rot':
+                    pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
+                    quat = (sub_node.get_float(4), sub_node.get_float(5), sub_node.get_float(6), sub_node.get_float(7))
+                    have_pos = True
 
             if have_pos:
-                return MovePlayerCommand(player_id, team_name, pos3d)
+                return MovePlayerCommand(player_id, team_name, pos3d, quat)
             else:
                 # TODO log error have beam command without position
                 return NoCommand("beam agent command without pos node")

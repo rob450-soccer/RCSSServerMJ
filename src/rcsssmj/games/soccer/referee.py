@@ -239,7 +239,8 @@ class SoccerReferee:
 
         self.game.game_state.set_play_mode(PlayMode.PLAY_ON)
 
-    def move_player(self, player_id: int, team_name: str, pos: tuple[float, float, float]) -> None:
+    def move_player(self, player_id: int, team_name: str, pos: tuple[float, float, float],
+                            quat: tuple[float, float, float, float] | None = None) -> None:
         """Move the specified player to the specified position.
 
         Parameter
@@ -248,14 +249,16 @@ class SoccerReferee:
             The unique id of the player in its team
         team_name: str
             The name of the team the player plays in or "Left" or "Right" for the left or the right team
-        pos: tuple[float, float] | None, default=None
+        pos: tuple[float, float, float]
             The position to which to move the player.
+        quat: tuple[float, float, float, float], default = None
+            The 3D rotation quaternion of the torso
         """
 
         self._did_act = True
 
         # check if team exists
-        team_id = None
+        team_id = TeamSide.LEFT
         if team_name == "Left":
             team_id = TeamSide.LEFT
         elif team_name == "Right":
@@ -278,6 +281,7 @@ class SoccerReferee:
         player = self.game.get_players(team_id).get(player_id)
         if player:
             player.place_pos = pos
+            player.place_quat = quat
             return
         else:
             logger.warning("player %d of team %s does not exist!", player_id, team_name)
