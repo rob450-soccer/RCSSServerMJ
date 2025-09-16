@@ -239,6 +239,50 @@ class SoccerReferee:
 
         self.game.game_state.set_play_mode(PlayMode.PLAY_ON)
 
+    def move_player(self, player_id: int, team_name: str, pos: tuple[float, float, float]) -> None:
+        """Move the specified player to the specified position.
+
+        Parameter
+        ---------
+        player_id: int
+            The unique id of the player in its team
+        team_name: str
+            The name of the team the player plays in or "Left" or "Right" for the left or the right team
+        pos: tuple[float, float] | None, default=None
+            The position to which to move the player.
+        """
+
+        self._did_act = True
+
+        # check if team exists
+        team_id = None
+        if team_name == "Left":
+            team_id = TeamSide.LEFT
+        elif team_name == "Right":
+            team_id = TeamSide.RIGHT
+
+        elif not self.game.left_players:
+            if not self.game.right_players:
+                logger.warning("No team available for beaming a player")
+                return
+            if self.game.game_state.get_team_name(TeamSide.RIGHT) == team_name:
+                team_id = TeamSide.RIGHT
+            else:
+                logger.warning("team %s does not exist!", team_name)
+                return
+        elif self.game.game_state.get_team_name(TeamSide.LEFT) != team_name:
+            logger.warning("team %s does not exist!", team_name)
+            return
+
+        # check if player exists
+        player = self.game.get_players(team_id).get(player_id)
+        if player:
+            player.place_pos = pos
+            return
+        else:
+            logger.warning("player %d of team %s does not exist!", player_id, team_name)
+            return
+
     def referee(self) -> None:
         """Referee the current game situation."""
 

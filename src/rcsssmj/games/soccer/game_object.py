@@ -111,6 +111,9 @@ class SoccerPlayer:
         self.position: tuple[float, float, float] = robot_spec.body('torso').pos[0:3].astype(np.float64)
         """The current position of the player."""
 
+        self.place_pos: tuple[float, float, float] | None = None
+        """The target position to place the player (if a player placement is requested by some referee command)."""
+
     def update(self, mj_model: Any, mj_data: Any) -> None:
         """Update ball state.
 

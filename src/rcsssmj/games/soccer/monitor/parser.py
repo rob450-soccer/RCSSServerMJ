@@ -1,7 +1,8 @@
 import logging
 from random import randint
 
-from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand, SetPlayModeCommand
+from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand, SetPlayModeCommand, MovePlayerCommand, \
+    NoCommand
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import DefaultCommandParser
 from rcsssmj.utils.sexpression import SExpression
@@ -46,7 +47,24 @@ class SoccerCommandParser(DefaultCommandParser):
         if node[0] == b'agent':
             # place agent command: (agent (unum <player_number>) (team <team_name>) (pos <x> <y> <z>))
             # alternative command: (agent (unum <player_number>) (team <team_name>) (move <x> <y> <z> <theta>))
-            return None
+            player_id = 0
+            team_name = ""
+            pos3d: tuple[float, float, float] = (0, 0, 0)
+            have_pos = False
+            for sub_node in node:
+                if isinstance(sub_node, SExpression) and sub_node[0] == b'unum':
+                    player_id = sub_node.get_int(1)
+                if isinstance(sub_node, SExpression) and sub_node[0] == b'team':
+                    team_name = sub_node.get_str(1)
+                if isinstance(sub_node, SExpression) and sub_node[0] == b'pos':
+                    pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
+                    have_pos = True
+
+            if have_pos:
+                return MovePlayerCommand(player_id, team_name, pos3d)
+            else:
+                # TODO log error have beam command without position
+                return NoCommand("beam agent command without pos node")
 
         if node[0] == b'playMode':
             # set play mode command: (playMode <play_mode>)
