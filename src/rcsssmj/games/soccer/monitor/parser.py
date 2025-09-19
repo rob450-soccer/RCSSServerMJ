@@ -1,12 +1,11 @@
 import logging
 from random import randint
 
-from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand, SetPlayModeCommand, MovePlayerCommand, \
-    NoCommand
+from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand, MovePlayerCommand, SetPlayModeCommand
+from rcsssmj.mjutils import quat_from_axis_angle
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import DefaultCommandParser
 from rcsssmj.utils.sexpression import SExpression
-from rcsssmj.mjutils import quat_from_axis_angle
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +37,9 @@ class SoccerCommandParser(DefaultCommandParser):
         if node[0] == b'ball':
             # place ball command: (ball (pos <x> <y> <z>) (vel <vx> <vy> <vz>))
             pos: tuple[float, float] | None = None
-            for sub_node in node:
-                if isinstance(sub_node, SExpression) and sub_node[0] == b'pos':
+
+            for sub_node in node.expressions():
+                if sub_node[0] == b'pos':
                     pos = (sub_node.get_float(1), sub_node.get_float(2))
                     break
 
@@ -48,36 +48,41 @@ class SoccerCommandParser(DefaultCommandParser):
         if node[0] == b'agent':
             # place agent: (agent (unum <player_number>) (team <team_name>) (pos <x> <y> <z>))
             # alternative: (agent (unum <player_number>) (team <team_name>) (move <x> <y> <z> <theta>))
-            # alternative: (agent (unum <player_number>) (team <team_name>) (rot <x> <y> <z> <q0> <q1> <q2> <q3>))
+            # alternative: (agent (unum <player_number>) (team <team_name>) (move3d <x> <y> <z> <q0> <q1> <q2> <q3>))
 
             player_id = 0
-            team_name = ""
+            team_name = ''
             pos3d: tuple[float, float, float] = (0, 0, 0)
             quat: tuple[float, float, float, float] | None = None
             have_pos = False
-            for sub_node in node:
-                if isinstance(sub_node, SExpression) and sub_node[0] == b'unum':
+
+            for sub_node in node.expressions():
+                if sub_node[0] == b'unum':
                     player_id = sub_node.get_int(1)
-                if isinstance(sub_node, SExpression) and sub_node[0] == b'team':
+
+                elif sub_node[0] == b'team':
                     team_name = sub_node.get_str(1)
-                if isinstance(sub_node, SExpression) and sub_node[0] == b'pos':
+
+                elif sub_node[0] == b'pos':
                     pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
                     have_pos = True
-                if isinstance(sub_node, SExpression) and sub_node[0] == b'move':
+
+                elif sub_node[0] == b'move':
                     pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
                     theta = sub_node.get_float(4)
                     quat = quat_from_axis_angle((0, 0, 1), theta)
                     have_pos = True
-                if isinstance(sub_node, SExpression) and sub_node[0] == b'rot':
+
+                elif sub_node[0] == b'move3d':
                     pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
                     quat = (sub_node.get_float(4), sub_node.get_float(5), sub_node.get_float(6), sub_node.get_float(7))
                     have_pos = True
 
-            if have_pos:
-                return MovePlayerCommand(player_id, team_name, pos3d, quat)
-            else:
-                # TODO log error have beam command without position
-                return NoCommand("beam agent command without pos node")
+            if not have_pos:
+                logger.debug('Move-agent command without position node!')
+                return None
+
+            return MovePlayerCommand(player_id, team_name, pos3d, quat)
 
         if node[0] == b'playMode':
             # set play mode command: (playMode <play_mode>)

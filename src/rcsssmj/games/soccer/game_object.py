@@ -115,7 +115,7 @@ class SoccerPlayer:
         """The target position to place the player (if a player placement is requested by some referee command)."""
 
         self.place_quat: tuple[float, float, float, float] | None = None
-        """The target rotation quaternion to place the player (if a player placement is requested )."""
+        """The target rotation quaternion to place the player (if a player placement is requested)."""
 
     def update(self, mj_model: Any, mj_data: Any) -> None:
         """Update ball state.
