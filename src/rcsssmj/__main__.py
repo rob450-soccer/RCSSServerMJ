@@ -46,8 +46,8 @@ def soccer_sim() -> None:
     parser.add_argument('-m', '--mport',      help='The monitor port.',                   default=60001,       type=int)
     parser.add_argument('-S', '--sequential', help='Run sequential with agent clients.',  default=False,       action='store_true')
     parser.add_argument('-s', '--sync',       help='Run synchronous with agent clients.', default=False,       action='store_true')
-    parser.add_argument('-r', '--realtime',   help='Run in real-time mode.',              default=True,        action='store_true')
-    parser.add_argument('-v', '--render',     help='Start internal monitor viewer.',      default=True,        action='store_true')
+    parser.add_argument('-r', '--realtime',   help='Run in real-time mode.',              default=True,        action=argparse.BooleanOptionalAction)
+    parser.add_argument('-v', '--render',     help='Start internal monitor viewer.',      default=True,        action=argparse.BooleanOptionalAction)
 
     # game arguments
     parser.add_argument('-f', '--field',      help='The soccer field version.',                                type=str, choices=field_versions)
