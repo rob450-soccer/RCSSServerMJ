@@ -350,10 +350,10 @@ The (soccer) game state perceptor.
 +-----------------+-------+---------+---------------------------------------------------+
 | **score right** | int   | goals   | The score (number of goals) of the right team.    |
 +-----------------+-------+---------+---------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.GameStatePerception`                             |
+| :py:class:`rcsssmj.games.soccer.client.perception.GameStatePerception`                |
 +-------------+-------------+-----------+-----------------------------------------------+
 
-Available play modes are specified in :py:class:`rcsssmj.game.soccer.PlayMode`.
+Available play modes are specified in :py:class:`rcsssmj.games.soccer.play_mode.PlayMode`.
 
 Frequency
     Every cycle.
@@ -564,7 +564,7 @@ This means that both teams specify beam locations relative to the left field sid
 +-----------------+-------+-------+-----------------------------------------------------+
 | **theta**       | float | deg   | The horizontal orientation / angle.                 |
 +-----------------+-------+-------+-----------------------------------------------------+
-| :py:class:`rcsssmj.client.action.BeamAction`                                          |
+| :py:class:`rcsssmj.games.soccer.client.action.BeamAction`                             |
 +-----------------+-------+-------+-----------------------------------------------------+
 
 Noise Model
