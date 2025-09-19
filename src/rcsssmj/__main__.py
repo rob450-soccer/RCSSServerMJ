@@ -59,7 +59,7 @@ def soccer_sim() -> None:
     # create game referee
     rule_book = create_soccer_rule_book(args.rules)
     if args.field is None:
-        args.field = rule_book.default_field_version
+        args.field = rule_book.default_field_version.value
     soccer_field = create_soccer_field(args.field)
     referee = SoccerReferee()
     sim = SoccerSimulation(soccer_field, rule_book, referee)
