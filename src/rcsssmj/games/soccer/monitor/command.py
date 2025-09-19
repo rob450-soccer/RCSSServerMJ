@@ -70,7 +70,7 @@ class DropBallCommand(SoccerMonitorCommand):
 
     def _perform(self, sci: PSoccerSimCommandInterface) -> None:
         sci.request_drop_ball(self.pos)
-        logger.info('[COMMAND] "drop-ball @ %s"', self.pos)
+        # logger.info('[COMMAND] "drop-ball @ %s"', self.pos)
 
 
 class SetPlayModeCommand(SoccerMonitorCommand):
@@ -93,3 +93,47 @@ class SetPlayModeCommand(SoccerMonitorCommand):
     def _perform(self, sci: PSoccerSimCommandInterface) -> None:
         # sci.request_play_mode(self.play_mode)
         logger.info('[COMMAND] "play-mode": %s', self.play_mode)
+
+
+class MovePlayerCommand(SoccerMonitorCommand):
+    """The command to move or rotate a player """
+
+    def __init__(self, player_id: int, team_name: str, pos: tuple[float, float, float],
+                 quat: tuple[float, float, float, float] | None = None) -> None:
+        """Construct a new move-player command.
+
+        Parameter
+        ---------
+        player_id: int
+            The unique id of the player in its team
+        team_name: str
+            The name of the team the player plays in or "Left" or "Right" for the left or the right team
+        pos: tuple[float, float, float]
+            The position to which to move the player.
+        quat: tuple[float, float, float, float], default = None
+            The 3D rotation quaternion of the torso
+        """
+
+        super().__init__()
+
+        self.player_id = player_id
+        self.team_name = team_name
+        self.pos: Final[tuple[float, float, float]] = pos
+        self.quat: Final[tuple[float, float, float, float] | None] = quat
+
+    def _perform(self, sci: PSoccerSimCommandInterface) -> None:
+        sci.request_move_player(self.player_id, self.team_name, self.pos, self.quat)
+        # logger.info('[COMMAND] "move player %d of team %s to %s"', self.player_id, self.team_name, self.pos)
+
+
+class NoCommand(SoccerMonitorCommand):
+    """Dummy command to return in case of an invalid command """
+
+    def __init__(self, message: str) -> None:
+        super().__init__()
+
+        self.message = message
+
+    def _perform(self, sci: PSoccerSimCommandInterface) -> None:
+        logger.info('[COMMAND] "invalid monitor command: %s"')
+

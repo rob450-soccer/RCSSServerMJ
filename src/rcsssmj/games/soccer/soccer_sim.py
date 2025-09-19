@@ -477,7 +477,19 @@ class SoccerSimulation(BaseSimulation):
             self.ball.position = pos
             self.ball.place_pos = None
 
-        # TODO: relocate players
+        # relocate players
+        for players in self._team_players.values():
+            for player in players.values():
+                if player.place_pos is not None:
+                    pos = (player.place_pos[0], player.place_pos[1], player.place_pos[2])
+                    quat = (1.0, 0.0, 0.0, 0.0)
+                    if player.place_quat is not None:
+                        quat = player.place_quat
+
+                    place_robot_3d(player.agent_id.prefix, self._mj_model, self._mj_data, pos, quat)
+                    player.position = pos
+                    player.place_pos = None
+                    player.place_quat = None
 
     def _generate_game_state_perception(self) -> Perception:
         return GameStatePerception(
@@ -567,3 +579,21 @@ class SoccerSimulation(BaseSimulation):
         """
 
         self.referee.drop_ball(pos)
+
+    def request_move_player(self, player_id: int, team_name: str, pos: tuple[float, float, float],
+                            quat: tuple[float, float, float, float] | None = None) -> None:
+        """Move the specified player to the specified position.
+
+        Parameter
+        ---------
+        player_id: int
+            The unique id of the player in its team
+        team_name: str
+            The name of the team the player plays in or "Left" or "Right" for the left or the right team
+        pos: tuple[float, float, float]
+            The position to which to move the player.
+        quat: tuple[float, float, float, float], default = None
+            The 3D rotation quaternion of the torso
+        """
+
+        self.referee.move_player(player_id, team_name, pos, quat)

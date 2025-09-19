@@ -43,3 +43,19 @@ class PSoccerSimCommandInterface(PSimCommandInterface, Protocol):
         pos: tuple[float, float] | None, default=None
             The position at which to drop the ball or none, to drop it at its current location.
         """
+
+    def request_move_player(self, player_id: int, team_name: str, pos: tuple[float, float, float],
+                            quat: tuple[float, float, float, float] | None = None) -> None:
+        """Move the specified player to the specified position.
+
+        Parameter
+        ---------
+        player_id: int
+            The unique id of the player in its team
+        team_name: str
+            The name of the team the player plays in or "Left" or "Right" for the left or the right team
+        pos: tuple[float, float, float]
+            The position to which to move the player.
+        quat: tuple[float, float, float, float], default = None
+            The 3D rotation quaternion of the torso
+        """
