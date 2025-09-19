@@ -97,13 +97,13 @@ Message Format
 S-Expression:
     .. code::
 
-        (pos (name <name>) (pos <x> <y> <z>))
+        (pos (n <name>) (pos <x> <y> <z>))
 
     Example message:
 
     .. code::
 
-        (pos (name torso_pos) (pos -0.122 24.575 0.762))
+        (pos (n torso_pos) (pos -0.122 24.575 0.762))
 
 
 .. _agent-protocol_orientation-perceptor:
@@ -143,13 +143,13 @@ Message Format
 S-Expression:
     .. code::
 
-        (quat (name <name>) (q <qw> <qx> <qy> <qz>))
+        (quat (n <name>) (q <qw> <qx> <qy> <qz>))
 
     Example message:
 
     .. code::
 
-        (quat (name torso_quat) (q 1.0 0.0 0.0 0.0))
+        (quat (n torso_quat) (q 1.0 0.0 0.0 0.0))
 
 
 .. _agent-protocol_gyro-rate-perceptor:
@@ -187,13 +187,13 @@ Message Format
 S-Expression:
     .. code::
 
-        (GYR (name <name>) (rt <rx> <ry> <rz>))
+        (GYR (n <name>) (rt <rx> <ry> <rz>))
 
     Example message:
 
     .. code::
 
-        (GYR (name torso_gyro) (rt -6.97 -3.31 25.16))
+        (GYR (n torso_gyro) (rt -6.97 -3.31 25.16))
 
 
 .. _agent-protocol_accelerometer-perceptor:
@@ -231,13 +231,13 @@ Message Format
 S-Expression:
     .. code::
 
-        (ACC (name <name>) (a <ax> <ay> <az>))
+        (ACC (n <name>) (a <ax> <ay> <az>))
 
     Example message:
 
     .. code::
 
-        (ACC (name torso_acc) (a 0.13 0.41 -9.75))
+        (ACC (n torso_acc) (a 0.13 0.41 -9.75))
 
 
 .. _agent-protocol_joint-state-perceptor:
@@ -275,13 +275,13 @@ Message Format
 S-Expression:
     .. code::
 
-        (HJ (name <name>) (ax <ax>) (vx <vx>))*
+        (HJ (n <name>) (ax <ax>) (vx <vx>))*
 
     Example message:
 
     .. code::
 
-        (HJ (name hj1) (ax 1.43) (vx 0.03)) (HJ (name hj2) (ax 16.92) (vx 1.44)) ...
+        (HJ (n hj1) (ax 1.43) (vx 0.03)) (HJ (n hj2) (ax 16.92) (vx 1.44)) ...
 
 
 .. _agent-protocol_touch-perceptor:
@@ -316,13 +316,13 @@ Message Format
 S-Expression:
     .. code::
 
-        (TCH name <name> val <active>)
+        (TCH n <name> val <active>)
 
     Example message:
 
     .. code::
 
-        (TCH name bumper val 1)
+        (TCH n bumper val 1)
 
 
 .. _agent-protocol_game-state-perceptor:
@@ -404,7 +404,7 @@ Frequency
 Point Object Detection
 """"""""""""""""""""""
 
-Point object detections are provided in polar coordinates (specifying the azimuth, elevation and distance values) where the origin is facing the x-axis.
+Point object detections are provided in polar coordinates (specifying the distance, azimuth and elevation values) where the origin is facing the x-axis.
 
 +---------------+-------+-------+-------------------------------------------------------+
 | Point Object  | Type  | Unit  | Description                                           |
@@ -412,11 +412,11 @@ Point object detections are provided in polar coordinates (specifying the azimut
 +===============+=======+=======+=======================================================+
 | **name**      | str   |       | The unique name of the detected object.               |
 +---------------+-------+-------+-------------------------------------------------------+
+| **distance**  | float | meter | The distance to the detected point.                   |
++---------------+-------+-------+-------------------------------------------------------+
 | **azimuth**   | float | deg   | The azimuth / horizontal angle to the detected point. |
 +---------------+-------+-------+-------------------------------------------------------+
 | **elevation** | float | deg   | The elevation / vertical angle to the detected point. |
-+---------------+-------+-------+-------------------------------------------------------+
-| **distance**  | float | meter | The distance to the detected point.                   |
 +---------------+-------+-------+-------------------------------------------------------+
 | :py:class:`rcsssmj.client.perception.ObjectDetection`                                 |
 +---------------+-------+-------+-------------------------------------------------------+

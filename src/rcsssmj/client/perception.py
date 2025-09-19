@@ -87,10 +87,10 @@ class PositionPerception(Perception):
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (pos (name <name>) (p <x> <y> <z>))
+        Expression format: (pos (n <name>) (p <x> <y> <z>))
         """
 
-        return f'(pos (name {self.name}) (p {self.x} {self.y} {self.z}))'
+        return f'(pos (n {self.name}) (p {self.x} {self.y} {self.z}))'
 
 
 class OrientationPerception(Perception):
@@ -134,10 +134,10 @@ class OrientationPerception(Perception):
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (quat (name <name>) (q <qw> <qx> <qy> <qz>))
+        Expression format: (quat (n <name>) (q <qw> <qx> <qy> <qz>))
         """
 
-        return f'(quat (name {self.name}) (q {self.qw} {self.qx} {self.qy} {self.qz}))'
+        return f'(quat (n {self.name}) (q {self.qw} {self.qx} {self.qy} {self.qz}))'
 
 
 class JointStatePerception(Perception):
@@ -172,15 +172,15 @@ class JointStatePerception(Perception):
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (HJ (name <name>) (ax <ax>), (vx <vx>))*
+        Expression format: (HJ (n <name>) (ax <ax>), (vx <vx>))*
         """
 
-        return ''.join(f'(HJ (name {name})(ax {ax})(vx {vx}))' for name, ax, vx in zip(self.joint_names, self.joint_axs, self.joint_vxs, strict=False))
+        return ''.join(f'(HJ (n {name})(ax {ax})(vx {vx}))' for name, ax, vx in zip(self.joint_names, self.joint_axs, self.joint_vxs, strict=False))
 
     def to_sexp2(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (JS (names <name1> <name2> ...) (axs <ax1> <ax2> ...))
+        Expression format: (JS (names <name1> <name2> ...) (axs <ax1> <ax2> ...) (vxs <vx1> <vx2> ...))
         """
 
         names = ' '.join(self.joint_names)
@@ -225,10 +225,10 @@ class GyroPerception(Perception):
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (GYR (name <name>) (rt <rx> <ry> <rz>))
+        Expression format: (GYR (n <name>) (rt <x> <y> <z>))
         """
 
-        return f'(GYR (name {self.name}) (rt {self.rx} {self.ry} {self.rz}))'
+        return f'(GYR (n {self.name}) (rt {self.rx} {self.ry} {self.rz}))'
 
 
 class AccelerometerPerception(Perception):
@@ -264,9 +264,12 @@ class AccelerometerPerception(Perception):
         """The linear acceleration along the z-axis."""
 
     def to_sexp(self) -> str:
-        """Return an symbolic expression representing this perception."""
+        """Return an symbolic expression representing this perception.
 
-        return f'(ACC (name {self.name}) (a {self.ax} {self.ay} {self.az}))'
+        Expression format: (ACC (n <name>) (a <x> <y> <z>))
+        """
+
+        return f'(ACC (n {self.name}) (a {self.ax} {self.ay} {self.az}))'
 
 
 class TouchPerception(Perception):
@@ -292,10 +295,10 @@ class TouchPerception(Perception):
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (TCH <name> val <active>)
+        Expression format: (TCH n <name> val <active>)
         """
 
-        return f'(TCH name {self.name} val {self.active})'
+        return f'(TCH n {self.name} val {self.active})'
 
 
 class PObjectDetection(Protocol):
@@ -323,7 +326,7 @@ class ObjectDetection:
             The azimuth (horizontal) angle.
 
         inclination : float
-            The inclination / elevation (vertival) angle.
+            The inclination / elevation (vertical) angle.
 
         azimuth : float
             The azimuth (horizontal) angle.
@@ -333,7 +336,7 @@ class ObjectDetection:
         """The name of the object / reference frame."""
 
         self.azimuth: Final[float] = azimuth
-        """The anzimuth (horizontal) angle to the detected point."""
+        """The azimuth (horizontal) angle to the detected point."""
 
         self.inclination: Final[float] = inclination
         """The elevation (vertical) angle to the detected point."""
@@ -344,10 +347,10 @@ class ObjectDetection:
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (<name> (pol <azimuth> <inclination> <distance>))
+        Expression format: (<name> (pol <distance> <azimuth> <inclination>))
         """
 
-        return f'({self.name} (pol {self.azimuth} {self.inclination} {self.distance}))'
+        return f'({self.name} (pol {self.distance} {self.azimuth} {self.inclination}))'
 
 
 class AgentDetection:
@@ -389,7 +392,7 @@ class AgentDetection:
     def to_sexp(self) -> str:
         """Return an symbolic expression representing this perception.
 
-        Expression format: (<name> (team <team-name>) (id <player-no>) [(<marker> (pol <h-angle> <v-angle> <distance>))])
+        Expression format: (<name> (team <team-name>) (id <player-no>) [(<marker> (pol <distance> <h-angle> <v-angle>))])
         """
 
         return '(' + self.name + ' (team ' + self.team_name + ')(id ' + str(self.player_no) + ')' + ''.join(detection.to_sexp() for detection in self.body_detections) + ')'
