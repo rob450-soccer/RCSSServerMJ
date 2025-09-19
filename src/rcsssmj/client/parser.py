@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from math import radians
 
 from rcsssmj.client.action import InitRequest, MotorAction, SimAction
 from rcsssmj.utils.sexpression import SExpression
@@ -76,8 +77,8 @@ class DefaultActionParser(ActionParser):
             # joint action: (<name> <q> <dq> <kp> <kd> <tau>)
             return MotorAction(
                 model_prefix + node.get_str(0),
-                node.get_float(1),
-                node.get_float(2),
+                radians(node.get_float(1)),
+                radians(node.get_float(2)),
                 node.get_float(3),
                 node.get_float(4),
                 node.get_float(5),

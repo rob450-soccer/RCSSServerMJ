@@ -199,7 +199,8 @@ class Client:
                     self._has_beamed = True
                 else:
                     motors = self.ROBOT_MOTORS[self._model_name]
-                    for motor, target_joint_position in zip(motors, target_joint_positions, strict=False):
+                    target_joint_positions_degrees = np.rad2deg(target_joint_positions)
+                    for motor, target_joint_position in zip(motors, target_joint_positions_degrees, strict=False):
                         msg_list.append(f'({motor} {target_joint_position:.2f} 0.0 {self.p_gain:.2f} {self.d_gain:.2f} 0.0)')
 
                     self.previous_action = nn_action

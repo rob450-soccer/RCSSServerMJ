@@ -1,4 +1,5 @@
 import logging
+from math import radians
 
 from rcsssmj.client.action import SimAction
 from rcsssmj.client.parser import DefaultActionParser
@@ -16,7 +17,7 @@ class SoccerActionParser(DefaultActionParser):
 
         if node[0] == b'beam' and n_elements == 4:
             # beam action (beam <x> <y> <theta>)
-            return BeamAction(model_prefix + 'beam', (node.get_float(1), node.get_float(2), node.get_float(3)))
+            return BeamAction(model_prefix + 'beam', (node.get_float(1), node.get_float(2), radians(node.get_float(3))))
 
         if node[0] == b'say' and n_elements > 1:
             # say action: (say <message>)

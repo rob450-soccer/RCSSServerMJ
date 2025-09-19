@@ -1,4 +1,5 @@
 import logging
+from math import radians
 from random import randint
 
 from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand, MovePlayerCommand, SetPlayModeCommand
@@ -69,7 +70,7 @@ class SoccerCommandParser(DefaultCommandParser):
 
                 elif sub_node[0] == b'move':
                     pos3d = (sub_node.get_float(1), sub_node.get_float(2), sub_node.get_float(3))
-                    theta = sub_node.get_float(4)
+                    theta = radians(sub_node.get_float(4))
                     quat = quat_from_axis_angle((0, 0, 1), theta)
                     have_pos = True
 
