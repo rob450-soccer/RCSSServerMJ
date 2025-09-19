@@ -15,7 +15,7 @@ Video: [https://youtu.be/iYWw7vATQU4](https://youtu.be/iYWw7vATQU4)
 This project uses [hatch](https://hatch.pypa.io) as project management tool.  
 You can install _hatch_ via your package manager or `pip install hatch` (or `pipx install hatch` on managed systems).
 
-After installing _hatch_, navigate to your local repository and run arbitrary scripts in isolated virtual environments via the _hatch run_ command (e.g. `hatch run mjrcssserver` for running the server with default parameter).
+After installing _hatch_, navigate to your local repository and run arbitrary scripts in isolated virtual environments via the _hatch run_ command (e.g. `hatch run rcssservermj` for running the server with default parameter).
 
 ### Local Installation
 
@@ -36,7 +36,7 @@ Use `-e` option to install the package in editing / development mode (e.g. `pip 
 Start the server:
 
 ```bash
-mjrcssserver -s 127.0.0.1 -p 60000 -m 60001
+rcssservermj -s 127.0.0.1 -p 60000 -m 60001
 ```
 
 CLI parameter:

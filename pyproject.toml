@@ -10,7 +10,7 @@ requires = [
 build-backend = "hatchling.build"
 
 [project]
-name = "rcsssmj"
+name = "rcssservermj"
 description = "MuJoCo based RoboCup Soccer Simulation Server"
 keywords = ["RoboCup", "Soccer", "Simulation", "AI"]
 readme = "README.md"
@@ -50,7 +50,7 @@ Repository = "https://gitlab.com/robocup-sim/rcssservermj/-/tree/master"
 Issues = "https://gitlab.com/robocup-sim/rcssservermj/-/issues"
 
 [project.scripts]
-mjrcssserver = "rcsssmj.__main__:soccer_sim"
+rcssservermj = "rcsssmj.__main__:soccer_sim"
 
 [tool.ruff]
 line-length = 240
