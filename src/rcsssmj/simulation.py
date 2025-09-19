@@ -413,7 +413,7 @@ class BaseSimulation(ABC):
 
         if agent_id is not None:
             # remove client model from simulation
-            self._mj_spec.detach_body(self._mj_spec.body(agent_id.prefix + 'torso'))
+            self._mj_spec.delete(self._mj_spec.body(agent_id.prefix + 'torso'))
 
             # delete various components manually, as they are not automatically removed again when the root body is detached
             # Note:
@@ -423,7 +423,7 @@ class BaseSimulation(ABC):
             # But at the moment, there is no guarantee that there will be no components left in the spec that may cause some trouble at some point.
             def del_els(el_list: list[Any]) -> None:
                 for el in el_list:
-                    el.delete()
+                    self._mj_spec.delete(el)
 
             model_spec = cast(Any, client.get_model_spec())
             # del_els(model_spec.cameras)
