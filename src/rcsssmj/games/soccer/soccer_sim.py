@@ -8,12 +8,10 @@ import mujoco
 
 from rcsssmj.agent.perception import Perception
 from rcsssmj.agents import AgentID, PAgent
-from rcsssmj.games.soccer.agent.parser import SoccerActionParser
 from rcsssmj.games.soccer.agent.perception import GameStatePerception
 from rcsssmj.games.soccer.field import SoccerField
 from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
 from rcsssmj.games.soccer.game_state import GameState
-from rcsssmj.games.soccer.monitor.parser import SoccerCommandParser
 from rcsssmj.games.soccer.monitor.state import SoccerEnvironmentInformation, SoccerGameInformation
 from rcsssmj.games.soccer.referee import SoccerReferee
 from rcsssmj.games.soccer.rules import FIFASoccerRules, SoccerRules
@@ -49,11 +47,7 @@ class SoccerSimulation(BaseSimulation):
             The soccer referee managing the game aspect of the simulation.
         """
 
-        super().__init__(
-            action_parser=SoccerActionParser(),
-            command_parser=SoccerCommandParser(),
-            vision_interval=2,
-        )
+        super().__init__(vision_interval=2)
 
         self.field: Final[SoccerField] = field
         """The soccer field specification."""

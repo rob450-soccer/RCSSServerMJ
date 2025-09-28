@@ -2,15 +2,12 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from queue import Empty
-from threading import Lock
 from typing import Any, Final, cast
 
 import mujoco
 import numpy as np
 
 from rcsssmj.agent.action import SimAction
-from rcsssmj.agent.encoder import DefaultPerceptionEncoder, PerceptionEncoder
-from rcsssmj.agent.parser import ActionParser, DefaultActionParser
 from rcsssmj.agent.perception import (
     AccelerometerPerception,
     AgentDetection,
@@ -25,12 +22,10 @@ from rcsssmj.agent.perception import (
     TouchPerception,
     VisionPerception,
 )
-from rcsssmj.agent.sim_agent import RemoteSimAgent, SimAgent, SimAgentState
+from rcsssmj.agent.sim_agent import SimAgent
 from rcsssmj.agents import AgentID, PAgent
-from rcsssmj.communication.connection import PConnection
 from rcsssmj.monitor.commands import MonitorCommand
-from rcsssmj.monitor.parser import CommandParser, DefaultCommandParser
-from rcsssmj.monitor.sim_monitor import RemoteSimMonitor, SimMonitor, SimMonitorState
+from rcsssmj.monitor.sim_monitor import SimMonitor
 from rcsssmj.monitor.state import SceneGraph, SimStateInformation
 from rcsssmj.resources.spec_provider import ModelSpecProvider
 
@@ -43,9 +38,6 @@ class BaseSimulation(ABC):
     def __init__(
         self,
         *,
-        action_parser: ActionParser | None = None,
-        perception_encoder: PerceptionEncoder | None = None,
-        command_parser: CommandParser | None = None,
         spec_provider: ModelSpecProvider | None = None,
         n_substeps: int = 4,
         vision_interval: int = 1,
@@ -54,15 +46,6 @@ class BaseSimulation(ABC):
 
         Parameter
         ---------
-        action_parser: ActionParser | None, default=None
-            Parser instance for parsing remote agent actions.
-
-        perception_encoder: PerceptionEncoder | None, default=None
-            Encoder instance for encoding perceptions for remote agents.
-
-        command_parser: CommandParser | None, default=None
-            Parser instance for parsing remote monitor commands.
-
         spec_provider: ModelSpecProvider | None, default=None
             MuJoCo model specification provider instance to use for loading model specifications.
 
@@ -72,15 +55,6 @@ class BaseSimulation(ABC):
         vision_interval: int, default=1
             The interval in which vision perception will be generated.
         """
-
-        self.action_parser: Final[ActionParser] = DefaultActionParser() if action_parser is None else action_parser
-        """Parser for parsing agent action messages."""
-
-        self.perception_encoder: Final[PerceptionEncoder] = DefaultPerceptionEncoder() if perception_encoder is None else perception_encoder
-        """Encoder for encoding agent perception messages."""
-
-        self.command_parser: Final[CommandParser] = DefaultCommandParser() if command_parser is None else command_parser
-        """Parser for parsing monitor command messages."""
 
         self.spec_provider: Final[ModelSpecProvider] = ModelSpecProvider() if spec_provider is None else spec_provider
         """Mujoco model specification provider for loading models."""
@@ -105,15 +79,6 @@ class BaseSimulation(ABC):
 
         self._world_markers: Sequence[tuple[str, str]] = []
         """The sequence of world markers used for generating vision perceptions."""
-
-        self._agents: list[SimAgent] = []
-        """The list of connected agents."""
-
-        self._monitors: list[SimMonitor] = []
-        """The list of connected monitors."""
-
-        self._mutex: Lock = Lock()
-        """Mutex for synchronizing simulation threads."""
 
     @property
     def frame_id(self) -> int:
@@ -150,140 +115,8 @@ class BaseSimulation(ABC):
 
         # TODO: Implement some sort of kill-flag that can be evaluated in external components (mainly the sim server) to trigger a shutdown.
 
-    def register_agents(self, *agent_or_conns: SimAgent | PConnection) -> None:
-        """Register new agents with the simulation.
-
-        Parameter
-        ---------
-        *agent_or_conns: SimAgent | PConnection
-            The agent instances to add / connections for which to add remote agents.
-        """
-
-        # create remote agent instances in case the parameter contain connections
-        agents = [agent_or_conn if isinstance(agent_or_conn, SimAgent) else RemoteSimAgent(agent_or_conn, self.action_parser, self.perception_encoder) for agent_or_conn in agent_or_conns]
-
-        with self._mutex:
-            self._agents.extend(agents)
-
-    def register_monitors(self, *monitor_or_conns: SimMonitor | PConnection) -> None:
-        """Register new monitors with the simulation.
-
-        Parameter
-        ---------
-        *monitor_or_conns: SimMonitor | PConnection
-            The monitor instances to add / connections for which to add remote monitors.
-        """
-
-        # create remote monitor instances in case the parameter contain connections
-        monitors = [monitor_or_conn if isinstance(monitor_or_conn, SimMonitor) else RemoteSimMonitor(monitor_or_conn, self.command_parser) for monitor_or_conn in monitor_or_conns]
-
-        with self._mutex:
-            self._monitors.extend(monitors)
-
-    def remove_agents(self, *agents: SimAgent) -> None:
-        """Remove the given agents from the simulation.
-
-        Note:
-        This method will not automatically deactivate the given agents.
-        Make sure to deactivate the agent instances before calling this method.
-
-        Parameter
-        ---------
-        *agents: SimAgent
-            The agent instances to remove.
-        """
-
-        with self._mutex:
-            for agent in agents:
-                self._agents.remove(agent)
-
-    def remove_monitors(self, *monitors: SimMonitor) -> None:
-        """Remove the given monitors from the simulation.
-
-        Note:
-        This method will not automatically deactivate the given monitors.
-        Make sure to shutdown the monitor instances before calling this method.
-
-        Parameter
-        ---------
-        *monitors: SimMonitor
-            The monitor instances to remove.
-        """
-
-        with self._mutex:
-            for monitor in monitors:
-                self._monitors.remove(monitor)
-
-    def filter_agents(self) -> tuple[list[SimAgent], list[SimAgent], list[SimAgent], list[SimAgent]]:
-        """Filter simulation agents by state.
-
-        Returns
-        -------
-        connected_agents: list[SimAgent]
-            The list of agents in connected state.
-
-        ready_agents: list[SimAgent]
-            The list of agents in ready state.
-
-        active_agents: list[SimAgent]
-            The list of agents in active state.
-
-        disconnected_agents: list[SimAgent]
-            The list of agents in disconnected state.
-        """
-
-        connected_agents: list[SimAgent] = []
-        ready_agents: list[SimAgent] = []
-        active_agents: list[SimAgent] = []
-        disconnected_agents: list[SimAgent] = []
-
-        with self._mutex:
-            for agent in self._agents:
-                state = agent.get_state()
-                if state == SimAgentState.INIT:
-                    connected_agents.append(agent)
-                elif state == SimAgentState.READY:
-                    ready_agents.append(agent)
-                elif state == SimAgentState.ACTIVE:
-                    active_agents.append(agent)
-                # elif state == SimAgentState.DISCONNECTED:
-                else:
-                    disconnected_agents.append(agent)
-
-        return connected_agents, ready_agents, active_agents, disconnected_agents
-
-    def filter_monitors(self) -> tuple[list[SimMonitor], list[SimMonitor]]:
-        """Filter simulation monitors by state.
-
-        Returns
-        -------
-        active_monitors: list[SimMonitor]
-            The list of active / connected monitors.
-
-        inactive_monitors: list[SimMonitor]
-            The list of inactive / disconnected monitors.
-        """
-
-        active_monitors: list[SimMonitor] = []
-        inactive_monitors: list[SimMonitor] = []
-
-        with self._mutex:
-            for monitor in self._monitors:
-                if monitor.get_state() == SimMonitorState.ACTIVE:
-                    active_monitors.append(monitor)
-                else:
-                    inactive_monitors.append(monitor)
-
-        return active_monitors, inactive_monitors
-
     def init(self) -> bool:
         """Initialize the game and create a new simulation world environment."""
-
-        # clear existing agents in case there are any to prevent memory leaks
-        with self._mutex:
-            for agent in self._agents:
-                agent.shutdown()
-            self._agents.clear()
 
         # initialize game and create game world environment
         self._mj_spec = self._create_world()
@@ -303,18 +136,8 @@ class BaseSimulation(ABC):
 
         return True
 
-    def shutdown(self, *, wait: bool = False) -> None:
+    def shutdown(self) -> None:
         """Shutdown simulation."""
-
-        # shutdown active agents
-        for agent in self._agents:
-            agent.shutdown(wait=wait)
-        self._agents.clear()
-
-        # shutdown active monitors
-        for monitor in self._monitors:
-            monitor.shutdown(wait=wait)
-        self._monitors.clear()
 
         self._mj_spec = None
         self._mj_model = None
