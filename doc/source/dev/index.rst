@@ -81,14 +81,14 @@ Run the Server
 --------------
 
 The main scripts of the package are specified in the *pyproject.toml* file.
-The simulation server script is called ``mjrcssserver`` and can be executed using *hatch*:
+The simulation server script is called ``rcssservermj`` and can be executed using *hatch*:
 
 .. code:: bash
 
-    hatch run mjrcssserver
+    hatch run rcssservermj
 
-With this command, *hatch* will run the ``mjrcssserver`` command within the default virtual environment.
-Use the ``-h`` option to get some help for the command (``hatch run mjrcssserver -h``).
+With this command, *hatch* will run the ``rcssservermj`` command within the default virtual environment.
+Use the ``-h`` option to get some help for the command (``hatch run rcssservermj -h``).
 
 
 Development Scripts
