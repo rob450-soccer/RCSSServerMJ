@@ -6,10 +6,10 @@ from typing import Any, Final
 
 import mujoco
 
-from rcsssmj.agent import AgentID, PAgent
-from rcsssmj.client.perception import Perception
-from rcsssmj.games.soccer.client.parser import SoccerActionParser
-from rcsssmj.games.soccer.client.perception import GameStatePerception
+from rcsssmj.agent.perception import Perception
+from rcsssmj.agents import AgentID, PAgent
+from rcsssmj.games.soccer.agent.parser import SoccerActionParser
+from rcsssmj.games.soccer.agent.perception import GameStatePerception
 from rcsssmj.games.soccer.field import SoccerField
 from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
 from rcsssmj.games.soccer.game_state import GameState
@@ -408,13 +408,13 @@ class SoccerSimulation(BaseSimulation):
         # update known team names
         self.game_state.update_team_names(agent.get_team_name())
 
-        # fetch team side for client
+        # fetch team side for agent
         team_id = self.game_state.get_team_side(agent.get_team_name()).value
 
         if not TeamSide.is_valid(team_id):
             return None
 
-        # check if a player with the same player number of the client is already present in the game
+        # check if a player with the same player number of the agent is already present in the game
         if agent.get_player_no() in self._team_players[team_id]:
             return None
 

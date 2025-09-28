@@ -1,9 +1,9 @@
 import logging
 from math import radians
 
-from rcsssmj.client.action import SimAction
-from rcsssmj.client.parser import DefaultActionParser
-from rcsssmj.games.soccer.client.action import BeamAction, SayAction
+from rcsssmj.agent.action import SimAction
+from rcsssmj.agent.parser import DefaultActionParser
+from rcsssmj.games.soccer.agent.action import BeamAction, SayAction
 from rcsssmj.utils.sexpression import SExpression
 
 logger = logging.getLogger(__name__)

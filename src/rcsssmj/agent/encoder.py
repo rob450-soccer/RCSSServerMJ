@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from rcsssmj.client.perception import Perception
+from rcsssmj.agent.perception import Perception
 
 
 class PerceptionEncoder(ABC):

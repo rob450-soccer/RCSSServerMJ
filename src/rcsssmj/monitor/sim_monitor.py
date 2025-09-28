@@ -109,7 +109,7 @@ class RemoteSimMonitor(SimMonitor):
         pass
 
     def _receive_loop(self) -> None:
-        """The internal receive loop for continuously receiving monitor client commands."""
+        """The internal receive loop for continuously receiving monitor commands."""
 
         while True:
             # receive next command message

@@ -6,7 +6,7 @@ from rcsssmj.games.soccer.play_mode import PlayMode
 from rcsssmj.games.teams import TeamSide
 
 if TYPE_CHECKING:
-    from rcsssmj.agent import AgentID
+    from rcsssmj.agents import AgentID
 
 logger = logging.getLogger(__name__)
 

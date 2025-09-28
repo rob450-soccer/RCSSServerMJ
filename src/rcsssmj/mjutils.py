@@ -4,7 +4,7 @@ from typing import Any
 import mujoco
 import numpy as np
 
-from rcsssmj.agent import AgentID, decode_agent_prefix
+from rcsssmj.agents import AgentID, decode_agent_prefix
 
 
 def quat_from_axis_angle(axis: tuple[float, float, float], angle: float) -> tuple[float, float, float, float]:

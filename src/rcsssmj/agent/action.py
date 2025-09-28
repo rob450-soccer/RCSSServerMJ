@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class InitRequest:
-    """Simple class for holding an initialization request message of a simulation client."""
+    """Simple class for holding an initialization request message of a simulation agent client."""
 
     def __init__(
         self,

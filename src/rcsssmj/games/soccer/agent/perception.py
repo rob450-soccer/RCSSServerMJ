@@ -1,6 +1,6 @@
 from typing import Final
 
-from rcsssmj.client.perception import Perception
+from rcsssmj.agent.perception import Perception
 
 
 class GameStatePerception(Perception):

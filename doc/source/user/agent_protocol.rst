@@ -36,7 +36,7 @@ General time perceptor, usually used to perceive the simulation / world time.
 +-------------+-------+---------+-------------------------------------------------------+
 | **time**    | float | seconds | The time.                                             |
 +-------------+-------+---------+-------------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.TimePerception`                                  |
+| :py:class:`rcsssmj.agent.perception.TimePerception`                                  |
 +-------------+-------------+-----------+-----------------------------------------------+
 
 Frequency
@@ -81,7 +81,7 @@ Virtual perceptor, representing the position of an object in the world.
 +-------------+-------+-------+---------------------------------------------------------+
 | **z**       | float | meter | The z-coordinate of the position.                       |
 +-------------+-------+-------+---------------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.PositionPerception`                              |
+| :py:class:`rcsssmj.agent.perception.PositionPerception`                              |
 +-------------+-------------+-----------+-----------------------------------------------+
 
 Frequency
@@ -127,7 +127,7 @@ Virtual perceptor, representing the orientation of an object in the world.
 +-------------+-------+------+------------------------------------------------------------+
 | **qz**      | float |      | The z-coordinate of the orientation quaternion.            |
 +-------------+-------+------+------------------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.OrientationPerception`                             |
+| :py:class:`rcsssmj.agent.perception.OrientationPerception`                             |
 +-------------+-------------+-----------+-------------------------------------------------+
 
 Frequency
@@ -171,7 +171,7 @@ Perceptor representing a gyro-rate sensor.
 +-------------+-------+-----------+-----------------------------------------------------+
 | **rz**      | float | deg / sec | The rotational velocity around the z-axis.          |
 +-------------+-------+-----------+-----------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.GyroPerception`                                  |
+| :py:class:`rcsssmj.agent.perception.GyroPerception`                                  |
 +-------------+-------------+-----------+-----------------------------------------------+
 
 Frequency
@@ -215,7 +215,7 @@ Perceptor representing an accelerometer sensor.
 +-------------+-------+-----------+-----------------------------------------------------+
 | **az**      | float | m / sec^2 | The acceleration along the z-axis.                  |
 +-------------+-------+-----------+-----------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.AccelerometerPerception`                         |
+| :py:class:`rcsssmj.agent.perception.AccelerometerPerception`                         |
 +-------------+-------------+-----------+-----------------------------------------------+
 
 Frequency
@@ -259,7 +259,7 @@ Perceptor representing a set of joint sensors, sensing joint position and veloci
 +-------------+-------------+-----------+-----------------------------------------------+
 | **vxs**     | [float,...] | deg / sec | The list of joint velocities.                 |
 +-------------+-------------+-----------+-----------------------------------------------+
-| :py:class:`rcsssmj.client.perception.JointStatePerception`                            |
+| :py:class:`rcsssmj.agent.perception.JointStatePerception`                            |
 +-------------+-------------+-----------+-----------------------------------------------+
 
 Frequency
@@ -300,7 +300,7 @@ Perceptor representing a touch / bumper sensor.
 | **active**  | int  | bool | - 0 for no contact;                                       |
 |             |      |      | - everything else for active contact.                     |
 +-------------+------+------+-----------------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.TouchPerception`                                 |
+| :py:class:`rcsssmj.agent.perception.TouchPerception`                                 |
 +-------------+-------------+-----------+-----------------------------------------------+
 
 Frequency
@@ -350,7 +350,7 @@ The (soccer) game state perceptor.
 +-----------------+-------+---------+---------------------------------------------------+
 | **score right** | int   | goals   | The score (number of goals) of the right team.    |
 +-----------------+-------+---------+---------------------------------------------------+
-| :py:class:`rcsssmj.games.soccer.client.perception.GameStatePerception`                |
+| :py:class:`rcsssmj.games.soccer.agent.perception.GameStatePerception`                |
 +-------------+-------------+-----------+-----------------------------------------------+
 
 Available play modes are specified in :py:class:`rcsssmj.games.soccer.play_mode.PlayMode`.
@@ -392,7 +392,7 @@ The (ideal) vision perceptor.
 +----------------+-----------------------+------+---------------------------------------+
 | **detections** | [ObjectDetection,...] |      | The list of object detections.        |
 +----------------+-----------------------+------+---------------------------------------+
-| :py:class:`rcsssmj.client.perception.VisionPerception`                                |
+| :py:class:`rcsssmj.agent.perception.VisionPerception`                                |
 +----------------+-----------------------+------+---------------------------------------+
 
 Frequency
@@ -418,7 +418,7 @@ Point object detections are provided in polar coordinates (specifying the distan
 +---------------+-------+-------+-------------------------------------------------------+
 | **elevation** | float | deg   | The elevation / vertical angle to the detected point. |
 +---------------+-------+-------+-------------------------------------------------------+
-| :py:class:`rcsssmj.client.perception.ObjectDetection`                                 |
+| :py:class:`rcsssmj.agent.perception.ObjectDetection`                                 |
 +---------------+-------+-------+-------------------------------------------------------+
 
 Noise Model
@@ -443,7 +443,7 @@ Each robot models specifies a set of visible markers that are represented as ind
 +---------------------+----------------------------+------+--------------------------------------------+
 | **body detections** | [PointObjectDetection,...] |      | The list of detected body part markers.    |
 +---------------------+----------------------------+------+--------------------------------------------+
-| :py:class:`rcsssmj.client.perception.AgentDetection`                                                 |
+| :py:class:`rcsssmj.agent.perception.AgentDetection`                                                 |
 +---------------------+----------------------------+------+--------------------------------------------+
 
 
@@ -516,7 +516,7 @@ Similarly, effector actions are only processed after successful initialization.
 +----------------+------+------+------------------------------------------------------------+
 | **player no**  | int  |      | The requested player number.                               |
 +----------------+------+------+------------------------------------------------------------+
-| :py:class:`rcsssmj.client.action.InitRequest`                                             |
+| :py:class:`rcsssmj.agent.action.InitRequest`                                             |
 +----------------+------+------+------------------------------------------------------------+
 
 
@@ -564,7 +564,7 @@ This means that both teams specify beam locations relative to the left field sid
 +-----------------+-------+-------+-----------------------------------------------------+
 | **theta**       | float | deg   | The horizontal orientation / angle.                 |
 +-----------------+-------+-------+-----------------------------------------------------+
-| :py:class:`rcsssmj.games.soccer.client.action.BeamAction`                             |
+| :py:class:`rcsssmj.games.soccer.agent.action.BeamAction`                             |
 +-----------------+-------+-------+-----------------------------------------------------+
 
 Noise Model
@@ -609,7 +609,7 @@ Effector for controlling a motor of the robot model associated with the agent in
 +-------------+-------+-----------+-----------------------------------------------------+
 | **tau**     | float | Nm        | The extra torque.                                   |
 +-------------+-------+-----------+-----------------------------------------------------+
-| :py:class:`rcsssmj.client.action.MotorAction`                                         |
+| :py:class:`rcsssmj.agent.action.MotorAction`                                         |
 +-------------+-------+-----------+-----------------------------------------------------+
 
 Noise Model

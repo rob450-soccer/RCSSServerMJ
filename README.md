@@ -42,7 +42,7 @@ rcssservermj -s 127.0.0.1 -p 60000 -m 60001
 CLI parameter:
 
 - `-s <ip>` to specify the server IP (default: 'localhost')
-- `-p <client_port>` to specify the client port (default: 60000)
+- `-p <agent_port>` to specify the agent port (default: 60000)
 - `-m <monitor_port>` to specify the monitor port (default: 60001)
 
 Stop the server: Simply <kbd>ctrl+c</kbd> the server process.
@@ -60,7 +60,7 @@ python mujoco_client.py -s localhost -p 60000 -t test -n 1
 CLI parameter:
 
 - `-s <ip>` to specify the server IP (default: 'localhost')
-- `-p <client_port>` to specify the client port (default: 60000)
+- `-p <agent_port>` to specify the agent port (default: 60000)
 - `-m <monitor_port>` to specify the team name (default: 'Test')
 - `-n <player_number>` to specify the player number (default: 1)
 

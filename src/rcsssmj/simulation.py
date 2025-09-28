@@ -8,11 +8,10 @@ from typing import Any, Final, cast
 import mujoco
 import numpy as np
 
-from rcsssmj.agent import AgentID, PAgent
-from rcsssmj.client.action import SimAction
-from rcsssmj.client.encoder import DefaultPerceptionEncoder, PerceptionEncoder
-from rcsssmj.client.parser import ActionParser, DefaultActionParser
-from rcsssmj.client.perception import (
+from rcsssmj.agent.action import SimAction
+from rcsssmj.agent.encoder import DefaultPerceptionEncoder, PerceptionEncoder
+from rcsssmj.agent.parser import ActionParser, DefaultActionParser
+from rcsssmj.agent.perception import (
     AccelerometerPerception,
     AgentDetection,
     GyroPerception,
@@ -26,7 +25,8 @@ from rcsssmj.client.perception import (
     TouchPerception,
     VisionPerception,
 )
-from rcsssmj.client.sim_client import RemoteSimClient, SimClient, SimClientState
+from rcsssmj.agent.sim_agent import RemoteSimAgent, SimAgent, SimAgentState
+from rcsssmj.agents import AgentID, PAgent
 from rcsssmj.communication.connection import PConnection
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.parser import CommandParser, DefaultCommandParser
@@ -55,10 +55,10 @@ class BaseSimulation(ABC):
         Parameter
         ---------
         action_parser: ActionParser | None, default=None
-            Parser instance for parsing remote client actions.
+            Parser instance for parsing remote agent actions.
 
         perception_encoder: PerceptionEncoder | None, default=None
-            Encoder instance for encoding perceptions for remote clients.
+            Encoder instance for encoding perceptions for remote agents.
 
         command_parser: CommandParser | None, default=None
             Parser instance for parsing remote monitor commands.
@@ -74,10 +74,10 @@ class BaseSimulation(ABC):
         """
 
         self.action_parser: Final[ActionParser] = DefaultActionParser() if action_parser is None else action_parser
-        """Parser for parsing client action messages."""
+        """Parser for parsing agent action messages."""
 
         self.perception_encoder: Final[PerceptionEncoder] = DefaultPerceptionEncoder() if perception_encoder is None else perception_encoder
-        """Encoder for encoding client perception messages."""
+        """Encoder for encoding agent perception messages."""
 
         self.command_parser: Final[CommandParser] = DefaultCommandParser() if command_parser is None else command_parser
         """Parser for parsing monitor command messages."""
@@ -106,8 +106,8 @@ class BaseSimulation(ABC):
         self._world_markers: Sequence[tuple[str, str]] = []
         """The sequence of world markers used for generating vision perceptions."""
 
-        self._clients: list[SimClient] = []
-        """The list of connected clients."""
+        self._agents: list[SimAgent] = []
+        """The list of connected agents."""
 
         self._monitors: list[SimMonitor] = []
         """The list of connected monitors."""
@@ -150,20 +150,20 @@ class BaseSimulation(ABC):
 
         # TODO: Implement some sort of kill-flag that can be evaluated in external components (mainly the sim server) to trigger a shutdown.
 
-    def register_clients(self, *client_or_conns: SimClient | PConnection) -> None:
-        """Register new clients with the simulation.
+    def register_agents(self, *agent_or_conns: SimAgent | PConnection) -> None:
+        """Register new agents with the simulation.
 
         Parameter
         ---------
-        *client_or_conns: SimClient | PConnection
-            The client instances to add / connections for which to add remote clients.
+        *agent_or_conns: SimAgent | PConnection
+            The agent instances to add / connections for which to add remote agents.
         """
 
-        # create remote client instances in case the parameter contain connections
-        clients = [client_or_conn if isinstance(client_or_conn, SimClient) else RemoteSimClient(client_or_conn, self.action_parser, self.perception_encoder) for client_or_conn in client_or_conns]
+        # create remote agent instances in case the parameter contain connections
+        agents = [agent_or_conn if isinstance(agent_or_conn, SimAgent) else RemoteSimAgent(agent_or_conn, self.action_parser, self.perception_encoder) for agent_or_conn in agent_or_conns]
 
         with self._mutex:
-            self._clients.extend(clients)
+            self._agents.extend(agents)
 
     def register_monitors(self, *monitor_or_conns: SimMonitor | PConnection) -> None:
         """Register new monitors with the simulation.
@@ -180,22 +180,22 @@ class BaseSimulation(ABC):
         with self._mutex:
             self._monitors.extend(monitors)
 
-    def remove_clients(self, *clients: SimClient) -> None:
-        """Remove the given clients from the simulation.
+    def remove_agents(self, *agents: SimAgent) -> None:
+        """Remove the given agents from the simulation.
 
         Note:
-        This method will not automatically deactivate the given clients.
-        Make sure to deactivate the client instances before calling this method.
+        This method will not automatically deactivate the given agents.
+        Make sure to deactivate the agent instances before calling this method.
 
         Parameter
         ---------
-        *clients: SimClient
-            The client instances to remove.
+        *agents: SimAgent
+            The agent instances to remove.
         """
 
         with self._mutex:
-            for client in clients:
-                self._clients.remove(client)
+            for agent in agents:
+                self._agents.remove(agent)
 
     def remove_monitors(self, *monitors: SimMonitor) -> None:
         """Remove the given monitors from the simulation.
@@ -214,43 +214,43 @@ class BaseSimulation(ABC):
             for monitor in monitors:
                 self._monitors.remove(monitor)
 
-    def filter_clients(self) -> tuple[list[SimClient], list[SimClient], list[SimClient], list[SimClient]]:
-        """Filter simulation clients by state.
+    def filter_agents(self) -> tuple[list[SimAgent], list[SimAgent], list[SimAgent], list[SimAgent]]:
+        """Filter simulation agents by state.
 
         Returns
         -------
-        connected_clients: list[SimClient]
-            The list of clients in connected state.
+        connected_agents: list[SimAgent]
+            The list of agents in connected state.
 
-        ready_clients: list[SimClient]
-            The list of clients in ready state.
+        ready_agents: list[SimAgent]
+            The list of agents in ready state.
 
-        active_clients: list[SimClient]
-            The list of clients in active state.
+        active_agents: list[SimAgent]
+            The list of agents in active state.
 
-        disconnected_clients: list[SimClient]
-            The list of clients in disconnected state.
+        disconnected_agents: list[SimAgent]
+            The list of agents in disconnected state.
         """
 
-        connected_clients: list[SimClient] = []
-        ready_clients: list[SimClient] = []
-        active_clients: list[SimClient] = []
-        disconnected_clients: list[SimClient] = []
+        connected_agents: list[SimAgent] = []
+        ready_agents: list[SimAgent] = []
+        active_agents: list[SimAgent] = []
+        disconnected_agents: list[SimAgent] = []
 
         with self._mutex:
-            for client in self._clients:
-                state = client.get_state()
-                if state == SimClientState.INIT:
-                    connected_clients.append(client)
-                elif state == SimClientState.READY:
-                    ready_clients.append(client)
-                elif state == SimClientState.ACTIVE:
-                    active_clients.append(client)
-                # elif state == SimClientState.DISCONNECTED:
+            for agent in self._agents:
+                state = agent.get_state()
+                if state == SimAgentState.INIT:
+                    connected_agents.append(agent)
+                elif state == SimAgentState.READY:
+                    ready_agents.append(agent)
+                elif state == SimAgentState.ACTIVE:
+                    active_agents.append(agent)
+                # elif state == SimAgentState.DISCONNECTED:
                 else:
-                    disconnected_clients.append(client)
+                    disconnected_agents.append(agent)
 
-        return connected_clients, ready_clients, active_clients, disconnected_clients
+        return connected_agents, ready_agents, active_agents, disconnected_agents
 
     def filter_monitors(self) -> tuple[list[SimMonitor], list[SimMonitor]]:
         """Filter simulation monitors by state.
@@ -279,11 +279,11 @@ class BaseSimulation(ABC):
     def init(self) -> bool:
         """Initialize the game and create a new simulation world environment."""
 
-        # clear existing clients in case there are any to prevent memory leaks
+        # clear existing agents in case there are any to prevent memory leaks
         with self._mutex:
-            for client in self._clients:
-                client.shutdown()
-            self._clients.clear()
+            for agent in self._agents:
+                agent.shutdown()
+            self._agents.clear()
 
         # initialize game and create game world environment
         self._mj_spec = self._create_world()
@@ -306,10 +306,10 @@ class BaseSimulation(ABC):
     def shutdown(self, *, wait: bool = False) -> None:
         """Shutdown simulation."""
 
-        # shutdown active clients
-        for client in self._clients:
-            client.shutdown(wait=wait)
-        self._clients.clear()
+        # shutdown active agents
+        for agent in self._agents:
+            agent.shutdown(wait=wait)
+        self._agents.clear()
 
         # shutdown active monitors
         for monitor in self._monitors:
@@ -321,53 +321,53 @@ class BaseSimulation(ABC):
         self._mj_data = None
         self._world_markers = []
 
-    def activate_clients(self, ready_clients: Sequence[SimClient]) -> tuple[list[SimClient], list[SimClient]]:
-        """Try activate the given list of clients.
+    def activate_agents(self, ready_agents: Sequence[SimAgent]) -> tuple[list[SimAgent], list[SimAgent]]:
+        """Try activate the given list of agents.
 
         Parameter
         ---------
-        ready_clients: Sequence[SimClient]
-            The list of clients to activate.
+        ready_agents: Sequence[SimAgent]
+            The list of agents to activate.
         """
 
-        activated_clients: list[SimClient] = []
-        clients_to_remove: list[SimClient] = []
+        activated_agents: list[SimAgent] = []
+        agents_to_remove: list[SimAgent] = []
 
-        for client in ready_clients:
-            if self._activate_client(client):
-                activated_clients.append(client)
+        for agent in ready_agents:
+            if self._activate_agent(agent):
+                activated_agents.append(agent)
             else:
-                # failed to activate client --> shutdown and remove client
-                logger.info('Failed to activate client %s. Shutting down client again.', client)
-                client.shutdown()
-                clients_to_remove.append(client)
+                # failed to activate agent --> shutdown and remove agent
+                logger.info('Failed to activate agent %s. Shutting down agent again.', agent)
+                agent.shutdown()
+                agents_to_remove.append(agent)
 
-        if activated_clients:
-            # recompile spec in case new clients got added
+        if activated_agents:
+            # recompile spec in case new agents got added
             self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
 
             # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
             mujoco.mj_forward(self._mj_model, self._mj_data)
 
-        return activated_clients, clients_to_remove
+        return activated_agents, agents_to_remove
 
-    def _activate_client(self, client: SimClient) -> bool:
-        """Try to activate the given client.
+    def _activate_agent(self, agent: SimAgent) -> bool:
+        """Try to activate the given agent.
 
         Parameter
         ---------
-        client: SimClient
-            The simulation client to activate.
+        agent: SimAgent
+            The simulation agent to activate.
         """
 
-        # try to load the robot model requested by the client
-        robot_spec = self.spec_provider.load_robot(client.get_model_name())
+        # try to load the robot model requested by the agent
+        robot_spec = self.spec_provider.load_robot(agent.get_model_name())
         if robot_spec is None:
             # failed to load the requested model --> report failure
             return False
 
         # request participation in game
-        agent_id = self._request_participation(client, robot_spec)
+        agent_id = self._request_participation(agent, robot_spec)
         if agent_id is None:
             # invalid team side -> report failure
             return False
@@ -376,43 +376,43 @@ class BaseSimulation(ABC):
         frame = self._mj_spec.worldbody.add_frame()
         frame.attach_body(robot_spec.body('torso'), agent_id.prefix, '')
 
-        client.activate(agent_id, robot_spec)
+        agent.activate(agent_id, robot_spec)
 
-        logger.info('Player %s joined the game.', client)
+        logger.info('Player %s joined the game.', agent)
 
         return True
 
-    def deactivate_clients(self, clients: Sequence[SimClient]) -> None:
-        """Deactivate the given list of clients.
+    def deactivate_agents(self, agents: Sequence[SimAgent]) -> None:
+        """Deactivate the given list of agents.
 
         Parameter
         ---------
-        clients: Sequence[SimClient]
-            The list of client instances to deactivate.
+        agents: Sequence[SimAgent]
+            The list of agent instances to deactivate.
         """
 
         recompile_spec = False
 
-        for client in clients:
-            recompile_spec |= self._deactivate_client(client)
+        for agent in agents:
+            recompile_spec |= self._deactivate_agent(agent)
 
         if recompile_spec:
             self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
 
-    def _deactivate_client(self, client: SimClient) -> bool:
-        """Deactivate the given client instance.
+    def _deactivate_agent(self, agent: SimAgent) -> bool:
+        """Deactivate the given agent instance.
 
         Parameter
         ---------
-        client: SimClient
-            The simulation client to activate.
+        agent: SimAgent
+            The simulation agent to activate.
         """
 
-        # check if client has been activated before
-        agent_id = client.get_id()
+        # check if agent has been activated before
+        agent_id = agent.get_id()
 
         if agent_id is not None:
-            # remove client model from simulation
+            # remove agent model from simulation
             self._mj_spec.delete(self._mj_spec.body(agent_id.prefix + 'torso'))
 
             # delete various components manually, as they are not automatically removed again when the root body is detached
@@ -425,7 +425,7 @@ class BaseSimulation(ABC):
                 for el in el_list:
                     self._mj_spec.delete(el)
 
-            model_spec = cast(Any, client.get_model_spec())
+            model_spec = cast(Any, agent.get_model_spec())
             # del_els(model_spec.cameras)
             # del_els(model_spec.geoms)
             # del_els(model_spec.lights)
@@ -438,50 +438,50 @@ class BaseSimulation(ABC):
             # remove agent from game
             self._handle_withdrawal(agent_id)
 
-            logger.info('Player %s left the game.', client)
+            logger.info('Player %s left the game.', agent)
 
             return True
 
         return False
 
-    def collect_actions(self, active_clients: Sequence[SimClient], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
-        """Collect the actions from all active clients.
+    def collect_actions(self, active_agents: Sequence[SimAgent], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
+        """Collect the actions from all active agents.
 
         Parameter
         ---------
-        active_clients: Sequence[SimClient]
-            The list of active clients.
+        active_agents: Sequence[SimAgent]
+            The list of active agents.
 
         block: bool, default=False
-            Wait for client actions to arrive.
+            Wait for agent actions to arrive.
 
         timeout: float, default=5
-            The time to wait for client actions to arrive. After this time, the client is considered inactive and will be shutdown.
+            The time to wait for agent actions to arrive. After this time, the agent is considered inactive and will be shutdown.
             If timeout is a negative number, it will wait forever.
         """
 
-        client_actions: list[SimAction] = []
+        agent_actions: list[SimAction] = []
 
-        # collect client actions and send perceptions
-        for client in active_clients:
+        # collect agent actions and send perceptions
+        for agent in active_agents:
             # collect all pending actions
-            action_queue = client.get_action_queue()
+            action_queue = agent.get_action_queue()
             try:
                 if block:
-                    # wait for exactly one client action
-                    client_actions += action_queue.get(timeout=timeout)
+                    # wait for exactly one agent action
+                    agent_actions += action_queue.get(timeout=timeout)
                 else:
                     # fetch all currently available actions
                     while action_queue.qsize() > 0:
-                        client_actions += action_queue.get_nowait()
+                        agent_actions += action_queue.get_nowait()
             except Empty:
                 if block:
-                    # client took too long to answer -> kill it
-                    logger.info('Team %s: Player %d did not respond for more than %.3f seconds. Forcing player shutdown.', client.get_team_name(), client.get_player_no(), timeout)
-                    client.shutdown()
+                    # agent took too long to answer -> kill it
+                    logger.info('Team %s: Player %d did not respond for more than %.3f seconds. Forcing player shutdown.', agent.get_team_name(), agent.get_player_no(), timeout)
+                    agent.shutdown()
                     continue
 
-        return client_actions
+        return agent_actions
 
     def collect_commands(self, active_monitors: Sequence[SimMonitor]) -> list[MonitorCommand]:
         """Collect the commands from all active monitors.
@@ -504,20 +504,20 @@ class BaseSimulation(ABC):
 
         return monitor_commands
 
-    def step(self, client_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand]) -> None:
+    def step(self, agent_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand]) -> None:
         """Perform a simulation step.
 
         Parameter
         ---------
-        client_actions: Sequence[SimAction]
-            The list of simulation actions.
+        agent_actions: Sequence[SimAction]
+            The list of simulation agent actions.
 
         monitor_commands: Sequence[MonitorCommand]
             The list of monitor commands.
         """
 
         # pre-step hook
-        self._pre_step(client_actions)
+        self._pre_step(agent_actions)
 
         # progress simulation
         mujoco.mj_step(self._mj_model, self._mj_data, self.n_substeps)
@@ -528,17 +528,17 @@ class BaseSimulation(ABC):
         # increment frame id
         self._frame_id += 1
 
-    def _pre_step(self, client_actions: Sequence[SimAction]) -> None:
+    def _pre_step(self, agent_actions: Sequence[SimAction]) -> None:
         """Method executed right before a simulation step.
 
         Parameter
         ---------
-        client_actions: Sequence[SimAction]
+        agent_actions: Sequence[SimAction]
             The list of simulation actions.
         """
 
-        # apply client actions
-        for action in client_actions:
+        # apply agent actions
+        for action in agent_actions:
             action.perform(self)
 
     def _post_step(self, monitor_commands: Sequence[MonitorCommand]) -> None:
@@ -554,13 +554,13 @@ class BaseSimulation(ABC):
         for command in monitor_commands:
             command.perform(self)
 
-    def generate_perceptions(self, active_clients: Sequence[SimClient], *, gen_vision: bool | None = None) -> None:
-        """Generate perceptions for active clients.
+    def generate_perceptions(self, active_agents: Sequence[SimAgent], *, gen_vision: bool | None = None) -> None:
+        """Generate perceptions for active agents.
 
         Parameter
         ---------
-        active_clients: Sequence[SimClient]
-            The list of clients considered as active in this simulation cycle.
+        active_agents: Sequence[SimAgent]
+            The list of agents considered as active in this simulation cycle.
 
         gen_vision: bool, default=None
             Generate vision perception. If None, vision is generated according to the `vision_interval` attribute.
@@ -582,7 +582,7 @@ class BaseSimulation(ABC):
         if gen_vision is None:
             gen_vision = self._frame_id % self.vision_interval == 0
 
-        # generate general perceptions equal for all clients
+        # generate general perceptions equal for all agents
         sim_time_perception = TimePerception('now', trunc2(self._mj_data.time))
         game_state_perception = self._generate_game_state_perception()
 
@@ -590,8 +590,8 @@ class BaseSimulation(ABC):
             # collect visible markers
             n_world_markers = len(self._world_markers)
             obj_markers = list(self._world_markers)
-            for client in active_clients:
-                obj_markers.extend(client.get_model_markers())
+            for player in active_agents:
+                obj_markers.extend(player.get_model_markers())
 
             # extract visible object positions
             n_markers = len(obj_markers)
@@ -599,15 +599,15 @@ class BaseSimulation(ABC):
             for idx, site in enumerate(obj_markers):
                 obj_pos[:, idx] = self._mj_data.site(site[0]).xpos.astype(np.float64)
 
-        # generate client specific perceptions
-        for client in active_clients:
+        # generate agent specific perceptions
+        for agent in active_agents:
             joint_names: list[str] = []
             joint_axs: list[float] = []
             joint_vxs: list[float] = []
-            client_perceptions: list[Perception] = [sim_time_perception, game_state_perception]
+            agent_perceptions: list[Perception] = [sim_time_perception, game_state_perception]
 
-            model_spec = cast(Any, client.get_model_spec())
-            agent_id = cast(AgentID, client.get_id())
+            model_spec = cast(Any, agent.get_model_spec())
+            agent_id = cast(AgentID, agent.get_id())
             prefix_length = len(agent_id.prefix)
 
             for sensor_spec in model_spec.sensors:
@@ -623,23 +623,23 @@ class BaseSimulation(ABC):
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_GYRO:
                     rvx, rvy, rvz = trunc2_vec(np.degrees(sensor.data[0:3]))
-                    client_perceptions.append(GyroPerception(sensor_name, rvx, rvy, rvz))
+                    agent_perceptions.append(GyroPerception(sensor_name, rvx, rvy, rvz))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
                     ax, ay, az = trunc2_vec(sensor.data[0:3])
-                    client_perceptions.append(AccelerometerPerception(sensor_name, ax, ay, az))
+                    agent_perceptions.append(AccelerometerPerception(sensor_name, ax, ay, az))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_TOUCH:
                     active = int(sensor.data[0])
-                    client_perceptions.append(TouchPerception(sensor_name, active))
+                    agent_perceptions.append(TouchPerception(sensor_name, active))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
                     qw, qx, qy, qz = trunc3_vec(sensor.data[0:4])
-                    client_perceptions.append(OrientationPerception(sensor_name, qw, qx, qy, qz))
+                    agent_perceptions.append(OrientationPerception(sensor_name, qw, qx, qy, qz))
 
                 elif sensor_spec.type == mujoco.mjtSensor.mjSENS_FRAMEPOS:
                     px, py, pz = trunc3_vec(sensor.data[0:3])
-                    client_perceptions.append(PositionPerception(sensor_name, px, py, pz))
+                    agent_perceptions.append(PositionPerception(sensor_name, px, py, pz))
 
                 # TODO: Add perceptions for force and hear
 
@@ -649,7 +649,7 @@ class BaseSimulation(ABC):
 
             # joint state perception
             if joint_names:
-                client_perceptions.append(JointStatePerception(joint_names, trunc2_vec(np.degrees(joint_axs)), trunc2_vec(np.degrees(joint_vxs))))
+                agent_perceptions.append(JointStatePerception(joint_names, trunc2_vec(np.degrees(joint_axs)), trunc2_vec(np.degrees(joint_vxs))))
 
             # ideal camera sensor-pipeline
             if gen_vision:
@@ -680,32 +680,32 @@ class BaseSimulation(ABC):
                     # extract simple world object detections
                     obj_detections: list[PObjectDetection] = [ObjectDetection(obj_markers[i][1], azimuths[i], elevations[i], distances[i]) for i in range(n_world_markers) if obj_visibility[i]]
 
-                    # extract agent object detections
+                    # extract player object detections
                     idx = n_world_markers
-                    for agent in active_clients:
-                        n_agent_markers = len(agent.get_model_markers())
-                        agent_detections = [ObjectDetection(obj_markers[i][1], azimuths[i], elevations[i], distances[i]) for i in range(idx, idx + n_agent_markers) if obj_visibility[i]]
-                        if agent_detections:
-                            obj_detections.append(AgentDetection('P', agent.get_team_name(), agent.get_player_no(), agent_detections))
+                    for player in active_agents:
+                        n_player_markers = len(player.get_model_markers())
+                        player_detections = [ObjectDetection(obj_markers[i][1], azimuths[i], elevations[i], distances[i]) for i in range(idx, idx + n_player_markers) if obj_visibility[i]]
+                        if player_detections:
+                            obj_detections.append(AgentDetection('P', player.get_team_name(), player.get_player_no(), player_detections))
 
-                        idx += n_agent_markers
+                        idx += n_player_markers
 
-                    client_perceptions.append(VisionPerception('See', obj_detections))
+                    agent_perceptions.append(VisionPerception('See', obj_detections))
 
-            # forward generated perceptions to client instance
-            client.set_perceptions(client_perceptions)
+            # forward generated perceptions to agent instance
+            agent.set_perceptions(agent_perceptions)
 
-    def send_perceptions(self, active_clients: Sequence[SimClient]) -> None:
-        """Send the previously generated perceptions to active clients.
+    def send_perceptions(self, active_agents: Sequence[SimAgent]) -> None:
+        """Send the previously generated perceptions to active agents.
 
         Parameter
         ---------
-        active_clients: Sequence[SimClient]
-            The list of active clients.
+        active_agents: Sequence[SimAgent]
+            The list of active agents.
         """
 
-        for client in active_clients:
-            client.send_perceptions()
+        for agent in active_agents:
+            agent.send_perceptions()
 
     def _generate_state_information(self) -> list[SimStateInformation]:
         """Generate simulation state information for updating monitor instances."""

@@ -2,7 +2,7 @@ from typing import Any, Final
 
 import numpy as np
 
-from rcsssmj.agent import AgentID
+from rcsssmj.agents import AgentID
 from rcsssmj.mjutils import filter_agent_contacts_with
 
 

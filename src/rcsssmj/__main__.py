@@ -42,7 +42,7 @@ def soccer_sim() -> None:
     # fmt: off
     # simulator arguments
     parser.add_argument('-a', '--host',       help='The server address.',                 default='127.0.0.1', type=str)
-    parser.add_argument('-c', '--cport',      help='The client port.',                    default=60000,       type=int)
+    parser.add_argument('-c', '--aport',      help='The agent port.',                     default=60000,       type=int)
     parser.add_argument('-m', '--mport',      help='The monitor port.',                   default=60001,       type=int)
     parser.add_argument('-S', '--sequential', help='Run sequential with agent clients.',  default=False,       action='store_true')
     parser.add_argument('-s', '--sync',       help='Run synchronous with agent clients.', default=False,       action='store_true')
@@ -65,7 +65,7 @@ def soccer_sim() -> None:
     sim = SoccerSimulation(soccer_field, rule_book, referee)
 
     # create server
-    server = SimServer(sim, args.host, args.cport, args.mport, sequential_mode=args.sequential, sync_mode=args.sync, real_time=args.realtime, render=args.render)
+    server = SimServer(sim, args.host, args.aport, args.mport, sequential_mode=args.sequential, sync_mode=args.sync, real_time=args.realtime, render=args.render)
 
     # register SIGINT handler
     def signal_handler(sig: int, frame: FrameType | int | signal.Handlers | None) -> None:

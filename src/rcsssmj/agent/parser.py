@@ -2,22 +2,22 @@ import logging
 from abc import ABC, abstractmethod
 from math import radians
 
-from rcsssmj.client.action import InitRequest, MotorAction, SimAction
+from rcsssmj.agent.action import InitRequest, MotorAction, SimAction
 from rcsssmj.utils.sexpression import SExpression
 
 logger = logging.getLogger(__name__)
 
 
 class ActionParser(ABC):
-    """Base class for client action message parsers."""
+    """Base class for simulation agent action message parsers."""
 
     @abstractmethod
     def parse_init(self, data: bytes | bytearray) -> InitRequest | None:
-        """Parse a client initialization message."""
+        """Parse a agent initialization message."""
 
     @abstractmethod
     def parse_action(self, data: bytes | bytearray, model_prefix: str) -> list[SimAction]:
-        """Parse a client action message."""
+        """Parse a agent action message."""
 
 
 class DefaultActionParser(ActionParser):
@@ -45,7 +45,7 @@ class DefaultActionParser(ActionParser):
         return InitRequest(model_name, team_name, player_no)
 
     def parse_action(self, data: bytes | bytearray, model_prefix: str) -> list[SimAction]:
-        """Try parsing an action message into individual simulation client actions."""
+        """Try parsing an action message into individual simulation agent actions."""
 
         actions: list[SimAction] = []
 
@@ -65,7 +65,7 @@ class DefaultActionParser(ActionParser):
         return actions
 
     def parse_node(self, node: SExpression, model_prefix: str) -> SimAction | None:
-        """Try parsing an action message node into an simulation client action."""
+        """Try parsing an action message node into an simulation agent action."""
 
         n_elements = len(node)
 

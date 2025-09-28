@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Final
 
-from rcsssmj.client.action import SimAction
+from rcsssmj.agent.action import SimAction
 from rcsssmj.games.soccer.soccer_sim_interfaces import PSoccerSimActionInterface
 from rcsssmj.simulation_interfaces import PSimActionInterface
 

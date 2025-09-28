@@ -14,18 +14,18 @@ logger = logging.getLogger(__name__)
 class SimServer:
     """The simulation server component.
 
-    The simulation server is the core server component, responsible for running the central simulation loop as well as managing client and monitor connections / communication.
+    The simulation server is the core server component, responsible for running the central simulation loop as well as managing agent and monitor connections / communication.
     Game specific logic is encapsulated in a referee instance, which is incorporated into the simulation loop.
 
     By default, the simulation server runs in a competition setup mode.
-    This means that it will try to simulate in real time and will not wait for client actions to arrive before the next simulation cycle.
-    In this scenario, connected clients are responsible for managing their resources and performance to respond in time (as it is the case for a real robot, too).
+    This means that it will try to simulate in real time and will not wait for agent actions to arrive before the next simulation cycle.
+    In this scenario, connected agents are responsible for managing their resources and performance to respond in time (as it is the case for a real robot, too).
 
     However, the server also offers a set of flags with which you can setup the server in a training / evaluation mode.
     Use the `sync_mode` flag to tell the server to wait for an action response of all active agents before simulating the next simulation cycle.
     When disabling the `real_time` flag, the server will not wait between simulation cycles to simulate a real-time scenario.
     Instead, it will directly progress to simulating the next simulation cycle - aka run "as-fast-as-possible".
-    When disabling the `real_time` flag, it is advised to activate sync mode, too, as otherwise there will be some severe desync between server and client processes.
+    When disabling the `real_time` flag, it is advised to activate sync mode, too, as otherwise there will be some severe desync between server and agent processes.
 
     At this point in time, the simulation server comes with a built-in mujoco viewer as internal monitor, which will be started by default.
     Note that due to the Python GIL and the fact that the mujoco viewer is designed to run synchronously, rendering will impact the real-time capability of the simulation in certain scenarios.
@@ -36,7 +36,7 @@ class SimServer:
         self,
         sim: BaseSimulation,
         host: str = '127.0.0.1',
-        client_port: int = 60000,
+        agent_port: int = 60000,
         monitor_port: int = 60001,
         *,
         sequential_mode: bool = False,
@@ -51,8 +51,8 @@ class SimServer:
         host: str
             The server host address.
 
-        client_port: int, default=60000
-            The port on which to listen for incoming client connections.
+        agent_port: int, default=60000
+            The port on which to listen for incoming agent connections.
 
         monitor_port: int, default=60001
             The port on which to listen for incoming monitor connections.
@@ -80,8 +80,8 @@ class SimServer:
         self.host: Final[str] = host
         """The server host address."""
 
-        self.client_port: Final[int] = client_port
-        """The port on which to listen for incoming client connections."""
+        self.agent_port: Final[int] = agent_port
+        """The port on which to listen for incoming agent connections."""
 
         self.monitor_port: Final[int] = monitor_port
         """The port on which to listen for incoming monitor connections."""
@@ -98,8 +98,8 @@ class SimServer:
         self.render: Final[bool] = render
         """Flag for enabling / disabling the internal mujoco viewer monitor."""
 
-        self._client_sock: socket.socket | None = None
-        """The socket for listening for incoming client connections (only present after the server has been started)."""
+        self._agent_sock: socket.socket | None = None
+        """The socket for listening for incoming agent connections (only present after the server has been started)."""
 
         self._monitor_sock: socket.socket | None = None
         """The socket for listening for incoming monitor connections (only present after the server has been started)."""
@@ -110,7 +110,7 @@ class SimServer:
     def run(self) -> None:
         """Run simulation server."""
 
-        if self._client_sock is not None or self._monitor_sock is not None:
+        if self._agent_sock is not None or self._monitor_sock is not None:
             # a simulation is already running...
             raise RuntimeError
 
@@ -118,11 +118,11 @@ class SimServer:
         logger.info('Starting server...')
         self._shutdown = False
 
-        # setup client socket
-        self._client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._client_sock.bind((self.host, self.client_port))
-        self._client_sock.listen(5)
+        # setup agent socket
+        self._agent_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._agent_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._agent_sock.bind((self.host, self.agent_port))
+        self._agent_sock.listen(5)
 
         # setup monitor socket
         try:
@@ -131,17 +131,17 @@ class SimServer:
             self._monitor_sock.bind((self.host, self.monitor_port))
             self._monitor_sock.listen(5)
         except ConnectionError:
-            self._client_sock.shutdown(socket.SHUT_RDWR)
-            self._client_sock.close()
+            self._agent_sock.shutdown(socket.SHUT_RDWR)
+            self._agent_sock.close()
             raise
 
         # create simulator threads
         sim_thread = Thread(target=self._run_simulation, name='sim_loop')
-        client_listener_thread = Thread(target=self._listen_for_clients, name='client_connections_listener')
+        agent_listener_thread = Thread(target=self._listen_for_agents, name='agent_connections_listener')
         monitor_listener_thread = Thread(target=self._listen_for_monitors, name='monitor_connections_listener')
 
         # start simulator threads
-        client_listener_thread.start()
+        agent_listener_thread.start()
         monitor_listener_thread.start()
         sim_thread.start()
 
@@ -154,27 +154,27 @@ class SimServer:
         logger.info('Shutting down Server...')
         self._shutdown = True
 
-        # shutdown client and monitor sockets
+        # shutdown agent and monitor sockets
         try:
-            self._client_sock.shutdown(socket.SHUT_RDWR)
+            self._agent_sock.shutdown(socket.SHUT_RDWR)
         except Exception:  # noqa: BLE001
-            logger.debug('ERROR while shutting down client socket!', exc_info=True)
+            logger.debug('ERROR while shutting down agent socket!', exc_info=True)
 
         try:
             self._monitor_sock.shutdown(socket.SHUT_RDWR)
         except Exception:  # noqa: BLE001
             logger.debug('ERROR while shutting down monitor socket!', exc_info=True)
 
-        # wait for client and monitor connection listener threads to finish
-        client_listener_thread.join()
+        # wait for agent and monitor connection listener threads to finish
+        agent_listener_thread.join()
         monitor_listener_thread.join()
 
-        # shutdown simulation (remove active clients and monitors)
+        # shutdown simulation (remove active agents and monitors)
         self.sim.shutdown(wait=True)
-        logger.info('Shutdown simulation (disconnected clients and monitors).')
+        logger.info('Shutdown simulation (disconnected agents and monitors).')
 
         # cleanup socket refs
-        self._client_sock = None
+        self._agent_sock = None
         self._monitor_sock = None
 
         logger.info('Shutting down server... DONE!')
@@ -186,30 +186,30 @@ class SimServer:
 
         logger.info('Shutdown requested.')
 
-    def _listen_for_clients(self) -> None:
-        """Wait for incoming client connections.
+    def _listen_for_agents(self) -> None:
+        """Wait for incoming agent connections.
 
-        Note: This method is executed by the client listener thread - don't call it independently!
+        Note: This method is executed by the agent listener thread - don't call it independently!
         """
 
-        if self._client_sock is None:
+        if self._agent_sock is None:
             return
 
-        logger.info('Listening for client connections on %s:%d', self.host, self.client_port)
+        logger.info('Listening for agent connections on %s:%d', self.host, self.agent_port)
         while not self._shutdown:
             try:
-                sock, addr = self._client_sock.accept()
+                sock, addr = self._agent_sock.accept()
             except Exception:  # noqa: BLE001
                 self._shutdown = True
                 break
 
-            logger.info('New client connection: %s.', addr)
+            logger.info('New agent connection: %s.', addr)
 
             conn = TCPLPMConnection(sock, addr)
-            self.sim.register_clients(conn)
+            self.sim.register_agents(conn)
 
-        logger.info('Shutdown client listener thread.')
-        self._client_sock.close()
+        logger.info('Shutdown agent listener thread.')
+        self._agent_sock.close()
 
     def _listen_for_monitors(self) -> None:
         """Wait for incoming monitor connections.
@@ -273,46 +273,46 @@ class SimServer:
 
         # parallel simulation update loop
         while not self._shutdown:
-            # filter clients / monitors by state, as their state may change during this simulation step
-            # this also simplifies client / monitor removal from the central client / monitor lists
-            _, ready_clients, active_clients, disconnected_clients = self.sim.filter_clients()
+            # filter agents / monitors by state, as their state may change during this simulation step
+            # this also simplifies agent / monitor removal from the central agent / monitor lists
+            _, ready_agents, active_agents, disconnected_agents = self.sim.filter_agents()
             active_monitors, monitors_to_remove = self.sim.filter_monitors()
 
-            # handle disconnected clients
-            self.sim.deactivate_clients(disconnected_clients)
+            # handle disconnected agents
+            self.sim.deactivate_agents(disconnected_agents)
 
-            # handle ready clients
-            activated_clients, deactivated_clients = self.sim.activate_clients(ready_clients)
+            # handle ready agents
+            activated_agents, deactivated_agents = self.sim.activate_agents(ready_agents)
 
             # generate perceptions
-            self.sim.generate_perceptions(active_clients + activated_clients)
+            self.sim.generate_perceptions(active_agents + activated_agents)
 
             # sleep to match simulation interval
             if self.real_time:
                 time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
                 cycle_start = time.time()
 
-            # collect client actions
-            # Note: Actions need to be collected before sending perceptions to clients in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
-            client_actions = self.sim.collect_actions(active_clients, block=self.sync_mode)
+            # collect agent actions
+            # Note: Actions need to be collected before sending perceptions to agents in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
+            agent_actions = self.sim.collect_actions(active_agents, block=self.sync_mode)
 
             # send perceptions
-            self.sim.send_perceptions(active_clients + activated_clients)
+            self.sim.send_perceptions(active_agents + activated_agents)
 
             # collect monitor commands
             monitor_commands = self.sim.collect_commands(active_monitors)
 
             # progress simulation
-            self.sim.step(client_actions, monitor_commands)
+            self.sim.step(agent_actions, monitor_commands)
 
             # update connected monitors
             self.sim.update_monitors(active_monitors)
 
             # TODO: log monitor message to simulator log
-            # TODO: log client perceptions and actions to client logs
+            # TODO: log agent perceptions and actions to agent logs
 
-            # remove disconnected clients and monitors
-            self.sim.remove_clients(*disconnected_clients, *deactivated_clients)
+            # remove disconnected agents and monitors
+            self.sim.remove_agents(*disconnected_agents, *deactivated_agents)
             self.sim.remove_monitors(*monitors_to_remove)
 
     def _sequential_update_loop(self) -> None:
@@ -328,42 +328,42 @@ class SimServer:
 
         # sequential simulation update loop
         while not self._shutdown:
-            # filter clients / monitors by state, as their state may change during this simulation step
-            # this also simplifies client / monitor removal from the central client / monitor lists
-            _, ready_clients, active_clients, disconnected_clients = self.sim.filter_clients()
+            # filter agents / monitors by state, as their state may change during this simulation step
+            # this also simplifies agent / monitor removal from the central agent / monitor lists
+            _, ready_agents, active_agents, disconnected_agents = self.sim.filter_agents()
             active_monitors, monitors_to_remove = self.sim.filter_monitors()
 
-            # handle disconnected clients
-            self.sim.deactivate_clients(disconnected_clients)
+            # handle disconnected agents
+            self.sim.deactivate_agents(disconnected_agents)
 
             # sleep to match simulation interval
             if self.real_time:
                 time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
                 cycle_start = time.time()
 
-            # Note: Actions need to be collected before sending perceptions to clients in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
-            client_actions = self.sim.collect_actions(active_clients, block=self.sync_mode)
+            # Note: Actions need to be collected before sending perceptions to agents in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
+            agent_actions = self.sim.collect_actions(active_agents, block=self.sync_mode)
 
             # collect monitor commands
             monitor_commands = self.sim.collect_commands(active_monitors)
 
             # progress simulation
-            self.sim.step(client_actions, monitor_commands)
+            self.sim.step(agent_actions, monitor_commands)
 
-            # handle ready clients
-            activated_clients, deactivated_clients = self.sim.activate_clients(ready_clients)
-            active_clients.extend(activated_clients)
+            # handle ready agents
+            activated_agents, deactivated_agents = self.sim.activate_agents(ready_agents)
+            active_agents.extend(activated_agents)
 
             # Note: In sequential mode, perceptions should ideally be sent directly after the simulation step to give the agents as much time as possible, while the server notifies monitors, etc.
-            self.sim.generate_perceptions(active_clients)
-            self.sim.send_perceptions(active_clients)
+            self.sim.generate_perceptions(active_agents)
+            self.sim.send_perceptions(active_agents)
 
             # update connected monitors
             self.sim.update_monitors(active_monitors)
 
             # TODO: log monitor message to simulator log
-            # TODO: log client perceptions and actions to client logs
+            # TODO: log agent perceptions and actions to agent logs
 
-            # remove disconnected clients and monitors
-            self.sim.remove_clients(*disconnected_clients, *deactivated_clients)
+            # remove disconnected agents and monitors
+            self.sim.remove_agents(*disconnected_agents, *deactivated_agents)
             self.sim.remove_monitors(*monitors_to_remove)
