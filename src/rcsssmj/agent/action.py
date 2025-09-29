@@ -72,8 +72,7 @@ class MotorAction(SimAction):
     """Class for representing a motor action."""
 
     def __init__(self, actuator_name: str, q: float, dq: float, kp: float, kd: float, tau: float):
-        """Construct a new motor action, which produces a torque on the actuator via a PD controller:
-        applied_torque = kp * (q - q_current) + kd * (dq - dq_current) + tau
+        """Construct a new motor action.
 
         Parameter
         ---------
@@ -114,17 +113,4 @@ class MotorAction(SimAction):
         """The extra torque of the actuator."""
 
     def perform(self, ai: PSimActionInterface) -> None:
-        actuator_tau_model = ai.mj_model.actuator(self.actuator_name + '_tau')
-        actuator_tau_data = ai.mj_data.actuator(self.actuator_name + '_tau')
-        actuator_pos_model = ai.mj_model.actuator(self.actuator_name + '_pos')
-        actuator_pos_data = ai.mj_data.actuator(self.actuator_name + '_pos')
-        actuator_vel_model = ai.mj_model.actuator(self.actuator_name + '_vel')
-        actuator_vel_data = ai.mj_data.actuator(self.actuator_name + '_vel')
-        if actuator_tau_model is not None:
-            actuator_tau_data.ctrl = self.tau
-            actuator_pos_data.ctrl = self.q
-            actuator_vel_data.ctrl = self.dq
-            actuator_pos_model.gainprm[0] = self.kp
-            actuator_pos_model.biasprm[1] = -self.kp
-            actuator_vel_model.gainprm[0] = self.kd
-            actuator_vel_model.biasprm[2] = -self.kd
+        ai.ctrl_motor(self.actuator_name, self.q, self.dq, self.kp, self.kd, self.tau)

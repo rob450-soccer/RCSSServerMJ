@@ -115,6 +115,56 @@ class BaseSimulation(ABC):
 
         # TODO: Implement some sort of kill-flag that can be evaluated in external components (mainly the sim server) to trigger a shutdown.
 
+    def ctrl_motor(
+        self,
+        name: str,
+        q: float,
+        dq: float,
+        kp: float,
+        kd: float,
+        tau: float,
+    ) -> None:
+        """Command a motor movement, which produces a torque on the actuator via a PD controller:
+
+        ``applied_torque = kp * (q - q_current) + kd * (dq - dq_current) + tau``
+
+        Parameter
+        ---------
+        name : str
+            The name of the motor actuator.
+
+        q : float
+            The target position of the actuator.
+
+        dq : float
+            The target velocity of the actuator.
+
+        kp : float
+            The proportional gain of the actuator.
+
+        kd : float
+            The derivative gain of the actuator.
+
+        tau : float
+            The torque of the actuator.
+        """
+
+        actuator_tau_model = self.mj_model.actuator(name + '_tau')
+        actuator_tau_data = self.mj_data.actuator(name + '_tau')
+        actuator_pos_model = self.mj_model.actuator(name + '_pos')
+        actuator_pos_data = self.mj_data.actuator(name + '_pos')
+        actuator_vel_model = self.mj_model.actuator(name + '_vel')
+        actuator_vel_data = self.mj_data.actuator(name + '_vel')
+
+        if actuator_tau_model is not None:
+            actuator_tau_data.ctrl = tau
+            actuator_pos_data.ctrl = q
+            actuator_vel_data.ctrl = dq
+            actuator_pos_model.gainprm[0] = kp
+            actuator_pos_model.biasprm[1] = -kp
+            actuator_vel_model.gainprm[0] = kd
+            actuator_vel_model.biasprm[2] = -kd
+
     def init(self) -> bool:
         """Initialize the game and create a new simulation world environment."""
 
