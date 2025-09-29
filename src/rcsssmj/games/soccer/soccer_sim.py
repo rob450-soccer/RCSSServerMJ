@@ -572,14 +572,32 @@ class SoccerSimulation(BaseSimulation):
 
         self.referee.drop_ball(pos)
 
-    def request_move_player(
+    def request_place_ball(
+        self,
+        pos: tuple[float, float, float],
+        vel: tuple[float, float, float] | None = None,
+    ) -> None:
+        """Place the ball at the specified position.
+
+        Parameter
+        ---------
+        pos: tuple[float, float, float]
+            The position at which to place the ball.
+
+        vel: tuple[float, float, float] | None, default=None
+            The ball velocity.
+        """
+
+        self.ball.place_pos = pos[0:2]
+
+    def request_place_player(
         self,
         player_id: int,
         team_name: str,
         pos: tuple[float, float, float],
         quat: tuple[float, float, float, float] | None = None,
     ) -> None:
-        """Move the specified player to the specified position.
+        """Place the specified player at the specified position.
 
         Parameter
         ---------
@@ -590,10 +608,26 @@ class SoccerSimulation(BaseSimulation):
             The name of the team the player plays in or "Left" or "Right" for the left or the right team.
 
         pos: tuple[float, float, float]
-            The position to which to move the player.
+            The position at which to place the player.
 
         quat: tuple[float, float, float, float] | None, default=None
             The 3D rotation quaternion of the torso.
         """
 
-        self.referee.move_player(player_id, team_name, pos, quat)
+        # check if team exists
+        team_id = TeamSide.UNKNOWN
+        if team_name == 'Left' or team_name == self.game_state.get_team_name(TeamSide.LEFT):
+            team_id = TeamSide.LEFT
+        elif team_name == 'Right' or team_name == self.game_state.get_team_name(TeamSide.RIGHT):
+            team_id = TeamSide.RIGHT
+        else:
+            logger.warning('Team %s does not exist!', team_name)
+            return
+
+        # check if player exists
+        player = self._team_players[team_id.value].get(player_id, None)
+        if player is not None:
+            player.place_pos = pos
+            player.place_quat = quat
+        else:
+            logger.warning('Player %d of team %s does not exist!', player_id, team_name)

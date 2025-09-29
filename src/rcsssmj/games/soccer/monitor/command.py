@@ -95,8 +95,36 @@ class SetPlayModeCommand(SoccerMonitorCommand):
         logger.info('[COMMAND] "play-mode": %s', self.play_mode)
 
 
-class MovePlayerCommand(SoccerMonitorCommand):
-    """The command to move or rotate a player"""
+class PlaceBallCommand(SoccerMonitorCommand):
+    """The place-ball command."""
+
+    def __init__(self, pos: tuple[float, float, float], vel: tuple[float, float, float] | None = None) -> None:
+        """Construct a new place-ball command.
+
+        Parameter
+        ---------
+        pos: tuple[float, float, float]
+            The position at which to place the ball.
+
+        vel: tuple[float, float, float] | None, default=None
+            The ball velocity.
+        """
+
+        super().__init__()
+
+        self.pos: Final[tuple[float, float, float]] = pos
+        """The position at which to place the ball."""
+
+        self.vel: Final[tuple[float, float, float] | None] = vel
+        """The ball velocity."""
+
+    def _perform(self, sci: PSoccerSimCommandInterface) -> None:
+        sci.request_place_ball(self.pos, self.vel)
+        # logger.info('[COMMAND] "place-ball @ %s with %s velocity"', self.pos, self.vel)
+
+
+class PlacePlayerCommand(SoccerMonitorCommand):
+    """The command to place a player at a specified pose."""
 
     def __init__(
         self,
@@ -105,7 +133,7 @@ class MovePlayerCommand(SoccerMonitorCommand):
         pos: tuple[float, float, float],
         quat: tuple[float, float, float, float] | None = None,
     ) -> None:
-        """Construct a new move-player command.
+        """Construct a new place-player command.
 
         Parameter
         ---------
@@ -116,7 +144,7 @@ class MovePlayerCommand(SoccerMonitorCommand):
             The name of the team the player plays in or "Left" or "Right" for the left or the right team.
 
         pos: tuple[float, float, float]
-            The position to which to move the player.
+            The position at which to place the player.
 
         quat: tuple[float, float, float, float], default=None
             The 3D rotation quaternion of the root body part (typically the torso).
@@ -124,18 +152,18 @@ class MovePlayerCommand(SoccerMonitorCommand):
 
         super().__init__()
 
-        self.player_id: int = player_id
+        self.player_id: Final[int] = player_id
         """The unique id of the player in its team."""
 
-        self.team_name: str = team_name
+        self.team_name: Final[str] = team_name
         """The name of the team the player plays in or "Left" or "Right" for the left or the right team."""
 
         self.pos: Final[tuple[float, float, float]] = pos
-        """The target position to which to move the player."""
+        """The target position at which to place the player."""
 
         self.quat: Final[tuple[float, float, float, float] | None] = quat
         """The target orientation at which to place the player (if existing)."""
 
     def _perform(self, sci: PSoccerSimCommandInterface) -> None:
-        sci.request_move_player(self.player_id, self.team_name, self.pos, self.quat)
-        # logger.info('[COMMAND] "move player %d of team %s to %s"', self.player_id, self.team_name, self.pos)
+        sci.request_place_player(self.player_id, self.team_name, self.pos, self.quat)
+        # logger.info('[COMMAND] "place player %d of team %s at %s"', self.player_id, self.team_name, self.pos)

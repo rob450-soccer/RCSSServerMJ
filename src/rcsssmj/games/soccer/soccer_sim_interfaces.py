@@ -44,14 +44,30 @@ class PSoccerSimCommandInterface(PSimCommandInterface, Protocol):
             The position at which to drop the ball or none, to drop it at its current location.
         """
 
-    def request_move_player(
+    def request_place_ball(
+        self,
+        pos: tuple[float, float, float],
+        vel: tuple[float, float, float] | None = None,
+    ) -> None:
+        """Place the ball at the specified position.
+
+        Parameter
+        ---------
+        pos: tuple[float, float, float]
+            The position at which to place the ball.
+
+        vel: tuple[float, float, float] | None, default=None
+            The ball velocity.
+        """
+
+    def request_place_player(
         self,
         player_id: int,
         team_name: str,
         pos: tuple[float, float, float],
         quat: tuple[float, float, float, float] | None = None,
     ) -> None:
-        """Move the specified player to the specified position.
+        """Place the specified player at the specified position.
 
         Parameter
         ---------
@@ -62,7 +78,7 @@ class PSoccerSimCommandInterface(PSimCommandInterface, Protocol):
             The name of the team the player plays in or "Left" or "Right" for the left or the right team.
 
         pos: tuple[float, float, float]
-            The position to which to move the player.
+            The position at which to place the player.
 
         quat: tuple[float, float, float, float] | None, default=None
             The 3D rotation quaternion of the torso.
