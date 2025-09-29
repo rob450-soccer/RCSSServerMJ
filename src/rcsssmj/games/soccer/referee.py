@@ -142,7 +142,6 @@ class SoccerReferee:
 
         self._did_act = True
         self.game.game_state.set_play_mode(PlayMode.GAME_OVER)
-        self.game.ball.place_pos = None
         self.game.ball.reset_contacts()
         self._agent_na_touch_ball = None
         self._team_na_score = None
@@ -158,7 +157,6 @@ class SoccerReferee:
 
         self._did_act = True
         self.game.game_state.goal(team_side)
-        self.game.ball.place_pos = None
         self._agent_na_touch_ball = None
         self._team_na_score = None
 
