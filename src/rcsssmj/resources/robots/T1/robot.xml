@@ -19,6 +19,7 @@
     <material name="black" rgba="0 0 0 1"/>
     <material name="white" rgba="1 1 1 1"/>
     <material name="gray" rgba="0.4 0.4 0.4 1"/>
+    <material name="team" rgba="0.4 0.4 0.4 1"/>
     <material name="transparent" rgba="0.5 0.5 0.5 1"/>
     <mesh name="Trunk" file="Trunk.STL"/>
     <mesh name="H1" file="H1.STL"/>
@@ -51,7 +52,7 @@
       <site name="torso" pos="0.0 0.0 0.0"/>
       <!-- <site name="torso-vismarker" pos="0 0 0"/> -->
       <inertial pos="0.0551365 -1.42058e-06 0.105062" quat="0.99996 1.40561e-05 -0.00899532 -1.39249e-05" mass="11.7" diaginertia="0.0915404 0.0767787 0.0556055"/>
-      <geom class="visual" material="gray" mesh="Trunk"/>
+      <geom class="visual" material="team" mesh="Trunk"/>
       <!-- <geom size="0.09 0.09" pos="0.055 0.022 0.1" type="capsule" quat="0.997189 -0.074930 0 0" class="collision" name="torso_left"/>
       <geom size="0.09 0.09" pos="0.055 -0.022 0.1" type="capsule" quat="0.997189 0.074930 0 0" class="collision" name="torso_right"/> -->
       <geom class="collision" size="0.075 0.1 0.15" pos="0.06 0 0.12" type="box" name="torso"/>

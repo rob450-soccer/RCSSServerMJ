@@ -422,15 +422,15 @@ class SoccerSimulation(BaseSimulation):
         self._team_players[team_id][agent.get_player_no()] = SoccerPlayer(agent_id, model_spec)
 
         # set team color and spawn position
-        root_body = model_spec.body('torso')
-        root_body.first_geom().rgba = [0, 0, 1, 1] if team_id == TeamSide.LEFT.value else [1, 0, 0, 1]
+        model_spec.material('team').rgba = [0, 0, 1, 1] if team_id == TeamSide.LEFT.value else [1, 0, 0, 1]
 
         x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
+        root_body = model_spec.body('torso')
         root_body.pos[0] = x_sign * (2 * agent_id.player_no + 1)
         root_body.pos[1] = (self.field.field_dim[1] / 2) + self.field.field_border
         root_body.quat[0:4] = quat_from_axis_angle((0, 0, 1), -pi / 2)
 
-        logger.debug('Spawn Team #%d Player #%02d @ (%.3f %.3f)', agent_id.team_id, agent_id.player_no, root_body.pos[0], root_body.pos[1])
+        logger.debug('Spawn team #%d player #%02d @ (%.3f %.3f)', agent_id.team_id, agent_id.player_no, root_body.pos[0], root_body.pos[1])
 
         return agent_id
 
