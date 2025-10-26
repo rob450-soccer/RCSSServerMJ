@@ -110,6 +110,10 @@ class BaseSimulation(ABC):
 
         return 0.0 if self._mj_data is None else self._mj_data.time
 
+    @property
+    def timestep(self) -> float:
+        return self.mj_model.opt.timestep * self.n_substeps
+
     def kill_sim(self) -> None:
         """Kill the simulation (server)."""
 

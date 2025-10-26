@@ -322,7 +322,7 @@ class SimServer:
 
         logger.info('Running a parallel simulation update loop.')
 
-        sim_timestep: float = self.sim.mj_model.opt.timestep * self.sim.n_substeps
+        sim_timestep: float = self.sim.timestep
         cycle_start: float = time.time() - sim_timestep
 
         # parallel simulation update loop
@@ -377,7 +377,7 @@ class SimServer:
 
         logger.info('Running a sequential simulation update loop.')
 
-        sim_timestep: float = self.sim.mj_model.opt.timestep * self.sim.n_substeps
+        sim_timestep: float = self.sim.timestep
         cycle_start: float = time.time() - sim_timestep
 
         # sequential simulation update loop
