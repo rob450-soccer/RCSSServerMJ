@@ -112,7 +112,9 @@ class BaseSimulation(ABC):
 
     @property
     def timestep(self) -> float:
-        return self.mj_model.opt.timestep * self.n_substeps
+        """The length of a simulation step (as percieved by an agent)."""
+
+        return float(self.mj_model.opt.timestep * self.n_substeps)
 
     def kill_sim(self) -> None:
         """Kill the simulation (server)."""
