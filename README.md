@@ -36,12 +36,12 @@ Use `-e` option to install the package in editing / development mode (e.g. `pip 
 Start the server:
 
 ```bash
-rcssservermj -s 127.0.0.1 -p 60000 -m 60001
+rcssservermj -a 127.0.0.1 -p 60000 -m 60001
 ```
 
 CLI parameter:
 
-- `-s <ip>` to specify the server IP (default: 'localhost')
+- `-a <ip>` to specify the server IP (default: 'localhost')
 - `-p <agent_port>` to specify the agent port (default: 60000)
 - `-m <monitor_port>` to specify the monitor port (default: 60001)
 
