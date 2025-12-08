@@ -5,7 +5,7 @@ requires = [
   "hatchling",
   # requirements.txt
   "numpy",
-  "mujoco==3.3.6"
+  "mujoco==3.4.0"
 ]
 build-backend = "hatchling.build"
 
@@ -34,7 +34,7 @@ requires-python = ">= 3.10"
 dependencies = [
   # When changing this, also update build-system.requires and requirements.txt
   "numpy",
-  "mujoco==3.3.6"
+  "mujoco==3.4.0"
 ]
 dynamic = ["version"]
 
