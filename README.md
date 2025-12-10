@@ -84,3 +84,10 @@ start_team.sh team1
 
 - Pitch texture taken from [dm_control](https://github.com/google-deepmind/dm_control/blob/main/dm_control/locomotion/soccer/assets/pitch/pitch_nologo_l.png)
 - Ant XML taken from [gymnasium](https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/envs/mujoco/assets/ant.xml)
+
+## License
+
+This project is licensed under the terms of the [MIT License](LICENSE).
+
+This applies to all files in this repository except where otherwise noted.
+Third-party components retain their original licenses.
