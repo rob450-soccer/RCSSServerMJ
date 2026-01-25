@@ -13,12 +13,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]) + '/src')
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-from rcsssmj.__about__ import __VERSION__ as RCSSMJ_VERSION
+from rcsssmj import __VERSION__ as RCSSSMJ_VERSION
 
 project = 'RCSSServerMJ'
 copyright = f'2025, {project} Developers'
-author = 'Nico Bohlinger, Stefan Glaser'
-release = RCSSMJ_VERSION
+author = 'Stefan Glaser'
+release = RCSSSMJ_VERSION
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

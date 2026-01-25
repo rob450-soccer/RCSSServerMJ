@@ -11,6 +11,8 @@ Development
 This chapter describes how to get started with developing the simulator.
 
 
+.. _dev_setup:
+
 Setup / Installation
 --------------------
 
@@ -23,6 +25,8 @@ Virtual environments are automatically created by hatch on demand (when running 
 The project itself and the environment specific dependencies specified in the *pyproject.toml* file are automatically installed in these virtual environments.
 Check out the `Docs <https://hatch.pypa.io/dev/tutorials/environment/basic-usage/>`_ for more information.
 
+
+.. _dev_hatch-config:
 
 Hatch Configuration
 ^^^^^^^^^^^^^^^^^^^
@@ -58,6 +62,8 @@ You can set the "dirs.data" entry to an arbitrary directory (e.g. "/home/user/ve
     hatch config set dirs.data /home/user/venvs/hatch
 
 
+.. _dev_venvs:
+
 Virtual Environments
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -77,6 +83,9 @@ in the project directory (containing the *pyproject.toml* file).
 The commands ``hatch env show`` and ``hatch env find`` can help to get an understanding which virtual environments exist and where they are located.
 
 
+.. _dev_run-server:
+
+
 Run the Server
 --------------
 
@@ -91,8 +100,14 @@ With this command, *hatch* will run the ``rcssservermj`` command within the defa
 Use the ``-h`` option to get some help for the command (``hatch run rcssservermj -h``).
 
 
+.. _dev_scripts:
+
+
 Development Scripts
 -------------------
+
+
+.. _dev_build:
 
 Build
 ^^^^^
@@ -109,6 +124,9 @@ This will generate a "dist" directory, in which you'll find the source release a
 Use ``hatch clean`` to clean the "dist" directory again.
 
 
+.. _dev_types:
+
+
 Type Checking
 ^^^^^^^^^^^^^
 
@@ -122,6 +140,8 @@ You can run a MyPy type checking with the following command:
 Which will effectively execute the "check" command, defined in the *pyproject.toml* file in the "types" environment (in which MyPy is installed).
 
 
+.. _dev_fmt:
+
 Formatting
 ^^^^^^^^^^
 
@@ -133,6 +153,8 @@ You can run the ruff code formatter via:
 
 to format the code and get some suggestions for improving your code.
 
+
+.. _dev_docs:
 
 Generate Docs
 ^^^^^^^^^^^^^
@@ -146,6 +168,8 @@ Running the following command will generate the html project docs in the "docs/b
 
 Clean the docs build directory via ``hatch run doc:clean``.
 
+
+.. _dev_tests:
 
 Run Tests
 ^^^^^^^^^
