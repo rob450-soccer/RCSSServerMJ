@@ -10,16 +10,20 @@ requires = [
 build-backend = "hatchling.build"
 
 [project]
-name = "rcssservermj"
+name = "rcsssmj"
 description = "MuJoCo based RoboCup Soccer Simulation Server"
-keywords = ["RoboCup", "Soccer", "Simulation", "AI"]
+keywords = ["RoboCup", "Humanoid", "Robot", "Soccer", "Simulation", "Competition", "Machine Learning", "AI", "MuJoCo"]
 readme = "README.md"
 authors = [
+    {name = "Stefan Glaser", email = "glaser.stefan@gmx.net"},
     {name = "Nico Bohlinger", email = "nico.bohlinger@gmail.com"},
+    {name = "Hannes Braun", email = "hannes@hannesbraun.net"}
+]
+maintainers = [
     {name = "Stefan Glaser", email = "glaser.stefan@gmx.net"}
 ]
 license = "MIT"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "src/rcsssmj/resources/robots/*/LICENSE", "AUTHORS.md"]
 classifiers = [
   # How mature is this project? Common values are
   #   3 - Alpha
@@ -27,7 +31,13 @@ classifiers = [
   #   5 - Production/Stable
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Physics",
   "Topic :: Software Development",
   "Typing :: Typed",
 ]
@@ -46,7 +56,7 @@ ogl = [
 
 [project.urls]
 Homepage = "https://gitlab.com/robocup-sim/rcssservermj"
-Documentation = "https://gitlab.com/robocup-sim/rcssservermj"
+Documentation = "https://robocup-sim.gitlab.io/rcssservermj/"
 Repository = "https://gitlab.com/robocup-sim/rcssservermj/-/tree/master"
 Issues = "https://gitlab.com/robocup-sim/rcssservermj/-/issues"
 
@@ -55,7 +65,7 @@ rcssservermj = "rcsssmj.__main__:soccer_sim"
 
 [tool.ruff]
 line-length = 240
-exclude = ["doc"]
+exclude = ["doc", "example"]
 
 [tool.ruff.format]
 quote-style = "single"
@@ -87,6 +97,15 @@ module = [
 ]
 ignore_missing_imports = true
 
+[tool.hatch.build]
+exclude = [
+  "/.*",          # hidden directories (caches, IDE settings, etc.)
+  "/analysis",    # scripts for internal API and performance analysis
+  "/docker",      # the docker files for the GitLab CI/CD runners
+  "/example",     # TODO: include examples once they are properly organized
+  "/tests"        # TODO: include tests once there are any
+]
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0"
@@ -111,7 +130,7 @@ extra-dependencies = [
 ]
 
 [tool.hatch.version]
-path = "src/rcsssmj/__about__.py"
+path = "src/rcsssmj/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rcsssmj"]

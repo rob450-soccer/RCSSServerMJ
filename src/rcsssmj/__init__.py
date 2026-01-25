@@ -1,1 +1,1 @@
-# So far intentionally empty
+__VERSION__ = '0.0.0'

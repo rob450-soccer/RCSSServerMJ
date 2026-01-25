@@ -13,11 +13,14 @@ doc/**/generated/
 .pytest_cache
 .ruff_cache
 
+# local analysis
+analysis/
+
 # mujoco log
 MUJOCO_LOG.TXT
 
 # logfiles
 console.log
 
-#dev environment configs
-.idea/*
+# dev environment configs
+.idea/
