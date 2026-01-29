@@ -28,23 +28,23 @@
     <mesh name="AL2" file="AL2.STL"/>
     <mesh name="AL3" file="AL3.STL"/>
     <mesh name="left_hand_link" file="left_hand_link.STL"/>
-    <mesh name="AR1" file="AR1.STL"/>
-    <mesh name="AR2" file="AR2.STL"/>
-    <mesh name="AR3" file="AR3.STL"/>
-    <mesh name="right_hand_link" file="right_hand_link.STL"/>
+    <mesh name="AR1" file="AL1.STL" scale="1 -1 1"/>
+    <mesh name="AR2" file="AL2.STL" scale="1 -1 1"/>
+    <mesh name="AR3" file="AL3.STL" scale="1 -1 1"/>
+    <mesh name="right_hand_link" file="left_hand_link.STL" scale="1 -1 1"/>
     <mesh name="Waist" file="Waist.STL"/>
     <mesh name="Hip_Pitch_Left" file="Hip_Pitch_Left.STL"/>
-    <mesh name="Hip_Roll_Left" file="Hip_Roll_Left.STL"/>
-    <mesh name="Hip_Yaw_Left" file="Hip_Yaw_Left.STL"/>
+    <mesh name="Hip_Roll_Left" file="Hip_Roll.STL"/>
+    <mesh name="Hip_Yaw_Left" file="Hip_Yaw.STL"/>
     <mesh name="Shank_Left" file="Shank_Left.STL"/>
     <mesh name="Ankle_Cross_Left" file="Ankle_Cross_Left.STL"/>
-    <mesh name="left_foot_link" file="left_foot_link.STL"/>
-    <mesh name="Hip_Pitch_Right" file="Hip_Pitch_Right.STL"/>
-    <mesh name="Hip_Roll_Right" file="Hip_Roll_Right.STL"/>
-    <mesh name="Hip_Yaw_Right" file="Hip_Yaw_Right.STL"/>
-    <mesh name="Shank_Right" file="Shank_Right.STL"/>
-    <mesh name="Ankle_Cross_Right" file="Ankle_Cross_Right.STL"/>
-    <mesh name="right_foot_link" file="right_foot_link.STL"/>
+    <mesh name="left_foot_link" file="foot_link.STL"/>
+    <mesh name="Hip_Pitch_Right" file="Hip_Pitch_Left.STL" scale="1 -1 1"/>
+    <mesh name="Hip_Roll_Right" file="Hip_Roll.STL"/>
+    <mesh name="Hip_Yaw_Right" file="Hip_Yaw.STL"/>
+    <mesh name="Shank_Right" file="Shank_Left.STL" scale="1 -1 1"/>
+    <mesh name="Ankle_Cross_Right" file="Ankle_Cross_Left.STL" scale="1 -1 1"/>
+    <mesh name="right_foot_link" file="foot_link.STL"/>
   </asset>
 
   <worldbody>
@@ -141,7 +141,7 @@
                   <joint name="Left_Ankle_Pitch" pos="0 0 0" axis="0 1 0" range="-0.87 0.35"/>
                   <geom class="visual" material="gray" mesh="Ankle_Cross_Left"/>
                   <body name="left_foot_link" pos="0 0.00025 -0.012">
-                  <site name="lfoot-vismarker" pos="0 0 0"/>
+                    <site name="lfoot-vismarker" pos="0 0 0"/>
                     <inertial pos="-0.000249 0 -0.00914" quat="0 0.679927 0 0.733279" mass="0.685" diaginertia="0.00268212 0.002385 0.000726885"/>
                     <joint name="Left_Ankle_Roll" pos="0 0 0" axis="1 0 0" range="-0.44 0.44"/>
                     <geom class="visual" material="gray" mesh="left_foot_link"/>
@@ -177,7 +177,7 @@
                   <joint name="Right_Ankle_Pitch" pos="0 0 0" axis="0 1 0" range="-0.87 0.35"/>
                   <geom class="visual" material="gray" mesh="Ankle_Cross_Right"/>
                   <body name="right_foot_link" pos="0 -0.00025 -0.012">
-                  <site name="rfoot-vismarker" pos="0 0 0"/>
+                    <site name="rfoot-vismarker" pos="0 0 0"/>
                     <inertial pos="-0.000248 0 -0.00914" quat="0 0.679927 0 0.733279" mass="0.685" diaginertia="0.00268212 0.002385 0.000726885"/>
                     <joint name="Right_Ankle_Roll" pos="0 0 0" axis="1 0 0" range="-0.44 0.44"/>
                     <geom class="visual" material="gray" mesh="right_foot_link"/>
@@ -294,6 +294,7 @@
 
     <gyro name="torso_gyro" site="torso"/>
     <accelerometer name="torso_acc" site="torso"/>
+
     <jointpos name="q_hj1" joint="AAHead_yaw"/>
     <jointpos name="q_hj2" joint="Head_pitch"/>
     <jointpos name="q_laj1" joint="Left_Shoulder_Pitch"/>
@@ -317,6 +318,7 @@
     <jointpos name="q_rlj4" joint="Right_Knee_Pitch"/>
     <jointpos name="q_rlj5" joint="Right_Ankle_Pitch"/>
     <jointpos name="q_rlj6" joint="Right_Ankle_Roll"/>
+
     <jointvel name="dq_hj1" joint="AAHead_yaw"/>
     <jointvel name="dq_hj2" joint="Head_pitch"/>
     <jointvel name="dq_laj1" joint="Left_Shoulder_Pitch"/>

@@ -1,12 +1,12 @@
 .. _robot-model_t1:
 
-Booster Robotics T1
-===================
+Booster T1
+==========
 
-The `T1 <https://www.boosterobotics.com/robots/>`_ robot from `Booster Robotics <https://www.boosterobotics.com/>`_ is a 1.18 meter tall humanoid robot with 23 degrees of freedom and a wight of approximately 30kg.
+The `T1 <https://www.booster.tech/booster-t1/>`_ robot from `Booster <https://www.booster.tech>`_ is a 1.18 meter tall humanoid robot with 23 degrees of freedom and a wight of approximately 30kg.
 It features 6 DoF per leg, 4 per arm, two for the head and one for the waist body.
 
-The T1 robot model used in the simulation is based on the official model files from Booster Robotics.
+The T1 robot model used in the simulation is based on the official model files from Booster.
 As a result, motions developed for the real robot should also work within the simulation and - with a bit of luck - vice versa.
 
 +--------------------+--------------------------------------------------------------+
