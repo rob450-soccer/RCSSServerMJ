@@ -22,7 +22,7 @@ from rcsssmj.agent.perception import (
     TouchPerception,
     VisionPerception,
 )
-from rcsssmj.agent.sim_agent import SimAgent
+from rcsssmj.agent.remote_agent import RemoteAgent
 from rcsssmj.agents import AgentID, PAgent
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.sim_monitor import SimMonitor
@@ -112,7 +112,7 @@ class BaseSimulation(ABC):
 
     @property
     def timestep(self) -> float:
-        """The length of a simulation step (as percieved by an agent)."""
+        """The length of a simulation step (as perceived by an agent)."""
 
         return float(self.mj_model.opt.timestep * self.n_substeps)
 
@@ -200,17 +200,17 @@ class BaseSimulation(ABC):
         self._mj_data = None
         self._world_markers = []
 
-    def activate_agents(self, ready_agents: Sequence[SimAgent]) -> tuple[list[SimAgent], list[SimAgent]]:
+    def activate_agents(self, ready_agents: Sequence[RemoteAgent]) -> tuple[list[RemoteAgent], list[RemoteAgent]]:
         """Try activate the given list of agents.
 
         Parameter
         ---------
-        ready_agents: Sequence[SimAgent]
-            The list of agents to activate.
+        ready_agents: Sequence[RemoteAgent]
+            The list of remote agents to activate.
         """
 
-        activated_agents: list[SimAgent] = []
-        agents_to_remove: list[SimAgent] = []
+        activated_agents: list[RemoteAgent] = []
+        agents_to_remove: list[RemoteAgent] = []
 
         for agent in ready_agents:
             if self._activate_agent(agent):
@@ -230,13 +230,13 @@ class BaseSimulation(ABC):
 
         return activated_agents, agents_to_remove
 
-    def _activate_agent(self, agent: SimAgent) -> bool:
+    def _activate_agent(self, agent: RemoteAgent) -> bool:
         """Try to activate the given agent.
 
         Parameter
         ---------
-        agent: SimAgent
-            The simulation agent to activate.
+        agent: RemoteAgent
+            The agent to activate.
         """
 
         # try to load the robot model requested by the agent
@@ -261,12 +261,12 @@ class BaseSimulation(ABC):
 
         return True
 
-    def deactivate_agents(self, agents: Sequence[SimAgent]) -> None:
+    def deactivate_agents(self, agents: Sequence[RemoteAgent]) -> None:
         """Deactivate the given list of agents.
 
         Parameter
         ---------
-        agents: Sequence[SimAgent]
+        agents: Sequence[RemoteAgent]
             The list of agent instances to deactivate.
         """
 
@@ -278,13 +278,13 @@ class BaseSimulation(ABC):
         if recompile_spec:
             self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
 
-    def _deactivate_agent(self, agent: SimAgent) -> bool:
+    def _deactivate_agent(self, agent: RemoteAgent) -> bool:
         """Deactivate the given agent instance.
 
         Parameter
         ---------
-        agent: SimAgent
-            The simulation agent to activate.
+        agent: RemoteAgent
+            The agent to activate.
         """
 
         # check if agent has been activated before
@@ -323,12 +323,12 @@ class BaseSimulation(ABC):
 
         return False
 
-    def collect_actions(self, active_agents: Sequence[SimAgent], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
+    def collect_actions(self, active_agents: Sequence[RemoteAgent], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
         """Collect the actions from all active agents.
 
         Parameter
         ---------
-        active_agents: Sequence[SimAgent]
+        active_agents: Sequence[RemoteAgent]
             The list of active agents.
 
         block: bool, default=False
@@ -433,12 +433,12 @@ class BaseSimulation(ABC):
         for command in monitor_commands:
             command.perform(self)
 
-    def generate_perceptions(self, active_agents: Sequence[SimAgent], *, gen_vision: bool | None = None) -> None:
+    def generate_perceptions(self, active_agents: Sequence[RemoteAgent], *, gen_vision: bool | None = None) -> None:
         """Generate perceptions for active agents.
 
         Parameter
         ---------
-        active_agents: Sequence[SimAgent]
+        active_agents: Sequence[RemoteAgent]
             The list of agents considered as active in this simulation cycle.
 
         gen_vision: bool, default=None
@@ -574,12 +574,12 @@ class BaseSimulation(ABC):
             # forward generated perceptions to agent instance
             agent.set_perceptions(agent_perceptions)
 
-    def send_perceptions(self, active_agents: Sequence[SimAgent]) -> None:
+    def send_perceptions(self, active_agents: Sequence[RemoteAgent]) -> None:
         """Send the previously generated perceptions to active agents.
 
         Parameter
         ---------
-        active_agents: Sequence[SimAgent]
+        active_agents: Sequence[RemoteAgent]
             The list of active agents.
         """
 

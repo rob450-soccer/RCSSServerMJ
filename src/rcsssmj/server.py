@@ -6,7 +6,7 @@ from typing import Final
 
 from rcsssmj.agent.encoder import DefaultPerceptionEncoder, PerceptionEncoder
 from rcsssmj.agent.parser import ActionParser, DefaultActionParser
-from rcsssmj.agent.sim_agent import RemoteSimAgent, SimAgent, SimAgentState
+from rcsssmj.agent.remote_agent import RemoteAgent, RemoteAgentState
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
 from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
 from rcsssmj.monitor.parser import CommandParser, DefaultCommandParser
@@ -128,7 +128,7 @@ class SimServer:
         self._monitor_sock: socket.socket | None = None
         """The socket for listening for incoming monitor connections (only present after the server has been started)."""
 
-        self._agents: list[SimAgent] = []
+        self._agents: list[RemoteAgent] = []
         """The list of connected agents."""
 
         self._monitors: list[SimMonitor] = []
@@ -252,7 +252,7 @@ class SimServer:
 
             # create remote agent instances
             conn = TCPLPMConnection(sock, addr)
-            agent = RemoteSimAgent(conn, self.action_parser, self.perception_encoder)
+            agent = RemoteAgent(conn, self.action_parser, self.perception_encoder)
 
             with self._mutex:
                 self._agents.append(agent)
@@ -422,7 +422,7 @@ class SimServer:
             self._remove_agents(*disconnected_agents, *deactivated_agents)
             self._remove_monitors(*monitors_to_remove)
 
-    def _remove_agents(self, *agents: SimAgent) -> None:
+    def _remove_agents(self, *agents: RemoteAgent) -> None:
         """Remove the given agents from the simulation.
 
         Note:
@@ -431,7 +431,7 @@ class SimServer:
 
         Parameter
         ---------
-        *agents: SimAgent
+        *agents: RemoteAgent
             The agent instances to remove.
         """
 
@@ -456,37 +456,37 @@ class SimServer:
             for monitor in monitors:
                 self._monitors.remove(monitor)
 
-    def _filter_agents(self) -> tuple[list[SimAgent], list[SimAgent], list[SimAgent], list[SimAgent]]:
+    def _filter_agents(self) -> tuple[list[RemoteAgent], list[RemoteAgent], list[RemoteAgent], list[RemoteAgent]]:
         """Filter simulation agents by state.
 
         Returns
         -------
-        connected_agents: list[SimAgent]
+        connected_agents: list[RemoteAgent]
             The list of agents in connected state.
 
-        ready_agents: list[SimAgent]
+        ready_agents: list[RemoteAgent]
             The list of agents in ready state.
 
-        active_agents: list[SimAgent]
+        active_agents: list[RemoteAgent]
             The list of agents in active state.
 
-        disconnected_agents: list[SimAgent]
+        disconnected_agents: list[RemoteAgent]
             The list of agents in disconnected state.
         """
 
-        connected_agents: list[SimAgent] = []
-        ready_agents: list[SimAgent] = []
-        active_agents: list[SimAgent] = []
-        disconnected_agents: list[SimAgent] = []
+        connected_agents: list[RemoteAgent] = []
+        ready_agents: list[RemoteAgent] = []
+        active_agents: list[RemoteAgent] = []
+        disconnected_agents: list[RemoteAgent] = []
 
         with self._mutex:
             for agent in self._agents:
                 state = agent.get_state()
-                if state == SimAgentState.INIT:
+                if state == RemoteAgentState.INIT:
                     connected_agents.append(agent)
-                elif state == SimAgentState.READY:
+                elif state == RemoteAgentState.READY:
                     ready_agents.append(agent)
-                elif state == SimAgentState.ACTIVE:
+                elif state == RemoteAgentState.ACTIVE:
                     active_agents.append(agent)
                 # elif state == SimAgentState.DISCONNECTED:
                 else:

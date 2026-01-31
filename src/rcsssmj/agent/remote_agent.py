@@ -1,5 +1,4 @@
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum
 from queue import Queue
@@ -16,8 +15,8 @@ from rcsssmj.communication.connection import PConnection
 logger = logging.getLogger(__name__)
 
 
-class SimAgentState(Enum):
-    """Simulation agnet state enum."""
+class RemoteAgentState(Enum):
+    """Remote simulation agent state enum."""
 
     INIT = 'init'
     """The agent has been added to the simulation server, but can not yet provide sufficient initialization information."""
@@ -32,34 +31,34 @@ class SimAgentState(Enum):
     """The agent has been shut down and is waiting to be removed from the simulation server."""
 
 
-class SimAgent(ABC):
-    """Simulation agent controlling a robot in simulation."""
+class RemoteAgent:
+    """Remote simulation agent, utilizing a message based connection to communicate with an external agent process."""
 
-    def __init__(self, model_name: str = '', team_name: str = '', player_no: int = -1) -> None:
-        """Construct a new simulation agent representation.
+    def __init__(self, conn: PConnection, parser: ActionParser, encoder: PerceptionEncoder) -> None:
+        """Construct a new remote simulation agent.
 
         Parameter
         ---------
-        model_name: str, default=''
-            The name of the robot model to load for this agent.
+        conn: PConnection
+            The agent connection.
 
-        team_name: str, default=''
-            The name of the team this agent belongs to.
+        parser: ActionParser
+            The action message parser instance.
 
-        player_no: int, default=-1
-            The agent player number.
+        encoder: PerceptionEncoder
+            The perception message encoder instance.
         """
 
-        self._state: SimAgentState = SimAgentState.READY if len(model_name) > 0 and len(team_name) > 0 and player_no >= 0 else SimAgentState.INIT
+        self._state: RemoteAgentState = RemoteAgentState.INIT
         """The agent state."""
 
-        self._model_name: str = model_name
+        self._model_name: str = ''
         """The name of the robot model used for this agent."""
 
-        self._team_name: str = team_name
+        self._team_name: str = ''
         """The name of the team the agent belongs to."""
 
-        self._player_no: int = player_no
+        self._player_no: int = -1
         """The player number."""
 
         self._agent_id: AgentID | None = None
@@ -77,7 +76,22 @@ class SimAgent(ABC):
         self._action_queue: Queue[Sequence[SimAction]] = Queue()
         """The queue to which incoming agent actions are forwarded."""
 
-    def get_state(self) -> SimAgentState:
+        self._conn: PConnection = conn
+        """The agent connection for exchanging perception and action messages."""
+
+        self._parser: ActionParser = parser
+        """Parser for parsing incoming action messages."""
+
+        self._encoder: PerceptionEncoder = encoder
+        """Encoder for encoding outgoing perception messages."""
+
+        self._receive_thread: Thread = Thread(target=self._receive_loop)
+        """The receive thread, running the receive loop."""
+
+        # start receive loop
+        self._receive_thread.start()
+
+    def get_state(self) -> RemoteAgentState:
         """Return the current agent state."""
 
         return self._state
@@ -123,12 +137,12 @@ class SimAgent(ABC):
         This method is called by the main simulation loop.
         """
 
-        if self._state == SimAgentState.READY:
+        if self._state == RemoteAgentState.READY:
             self._agent_id = agent_id
             self._model_spec = spec
             self._model_markers = [(site.name, ''.join(site.name.split('-')[3:-1])) for site in spec.sites if site.name.endswith('-vismarker')]
 
-            self._state = SimAgentState.ACTIVE
+            self._state = RemoteAgentState.ACTIVE
 
     def shutdown(self, *, wait: bool = False) -> None:
         """Stop the agent.
@@ -139,7 +153,10 @@ class SimAgent(ABC):
             True, if the calling thread should be blocked until the agent has finished its shutdown process, false if not.
         """
 
-        self._state = SimAgentState.SHUTDOWN
+        self._conn.shutdown()
+
+        if wait:
+            self._receive_thread.join()
 
     def set_perceptions(self, perceptions: Sequence[Perception]) -> None:
         """Set the perceptions of the agent for this simulation cycle.
@@ -154,61 +171,6 @@ class SimAgent(ABC):
 
         # buffer perception
         self._perceptions = perceptions
-
-    @abstractmethod
-    def send_perceptions(self) -> None:
-        """Send buffered agent perceptions.
-
-        This method is called by the main simulation loop.
-        """
-
-    def __str__(self) -> str:
-        return f'{self._team_name} #{self._player_no}'
-
-    def __repr__(self) -> str:
-        return f'SimAgent({self._model_name}, {self._team_name}, {self._player_no})'
-
-
-class RemoteSimAgent(SimAgent):
-    """Remote simulation agent, utilizing a message based connection to communicate with an external agent process."""
-
-    def __init__(self, conn: PConnection, parser: ActionParser, encoder: PerceptionEncoder) -> None:
-        """Construct a new remote simulation agent.
-
-        Parameter
-        ---------
-        conn: PConnection
-            The agent connection.
-
-        parser: ActionParser
-            The action message parser instance.
-
-        encoder: PerceptionEncoder
-            The perception message encoder instance.
-        """
-
-        super().__init__()
-
-        self._conn: PConnection = conn
-        """The agent connection for exchanging perception and action messages."""
-
-        self._parser: ActionParser = parser
-        """Parser for parsing incoming action messages."""
-
-        self._encoder: PerceptionEncoder = encoder
-        """Encoder for encoding outgoing perception messages."""
-
-        self._receive_thread: Thread = Thread(target=self._receive_loop)
-        """The receive thread, running the receive loop."""
-
-        # start receive loop
-        self._receive_thread.start()
-
-    def shutdown(self, *, wait: bool = False) -> None:
-        self._conn.shutdown()
-
-        if wait:
-            self._receive_thread.join()
 
     def send_perceptions(self) -> None:
         if not self._conn.is_active():
@@ -240,7 +202,7 @@ class RemoteSimAgent(SimAgent):
                 logger.debug('Agent connection %s closed!', self._conn)
                 break
 
-            if self._state == SimAgentState.INIT:
+            if self._state == RemoteAgentState.INIT:
                 # agent is in INIT state -> process initialization message
                 init_action = self._parser.parse_init(msg)
 
@@ -255,9 +217,9 @@ class RemoteSimAgent(SimAgent):
                 self._player_no = init_action.player_no
 
                 # signal ready state
-                self._state = SimAgentState.READY
+                self._state = RemoteAgentState.READY
 
-            elif self._state == SimAgentState.ACTIVE:
+            elif self._state == RemoteAgentState.ACTIVE:
                 # agent is in ACTIVE state -> process action message
                 actions = self._parser.parse_action(msg, cast(AgentID, self._agent_id).prefix)
 
@@ -268,7 +230,7 @@ class RemoteSimAgent(SimAgent):
                 # agent is in READY or SHUTDOWN state -> we don't expect any messages from the agent in these states
                 pass
 
-        self._state = SimAgentState.SHUTDOWN
+        self._state = RemoteAgentState.SHUTDOWN
         self._conn.close()
 
         # add a dummy action to prevent possible timeout in sync-mode (one should be enough, but two don't hurt either)
@@ -281,52 +243,4 @@ class RemoteSimAgent(SimAgent):
         return f'{self._team_name} #{self._player_no} @ {self._conn}'
 
     def __repr__(self) -> str:
-        return f'TCPSimAgent({self._conn.__repr__()})'
-
-
-class ManagedSimAgent(SimAgent):
-    """(Externally) managed agent controlling a robot in simulation and running synchronous with the simulation (one step behind).
-
-    The managed agent can be used in learning scenarios, where observations and actions are processed / generated by a learning algorithm in a gymnasium like environment.
-    The list of current agent perceptions as well as the action queue is exposed to the user and it's the users responsibility to process / set them accordingly before progressing the simulation.
-    """
-
-    def __init__(self, model_name: str, team_name: str, player_no: int) -> None:
-        """Construct a new managed agent representation.
-
-        Parameter
-        ---------
-        model_name: str
-            The name of the robot model to load for this agent.
-
-        team_name: str
-            The name of the team this agent belongs to.
-
-        player_no: int
-            The player number.
-        """
-
-        super().__init__(model_name, team_name, player_no)
-
-    def send_perceptions(self) -> None:
-        # noting to send here...
-        pass
-
-    def get_perceptions(self) -> Sequence[Perception]:
-        """Return the list of agent perceptions."""
-
-        return self._perceptions
-
-    def put_action(self, actions: Sequence[SimAction]) -> None:
-        """Put the given actions to the action queue.
-
-        Parameter
-        ---------
-        actions: Sequence[SimAction]
-            The list of actions.
-        """
-
-        self._action_queue.put(actions)
-
-    def __repr__(self) -> str:
-        return f'ManagedSimAgent({self._model_name}, {self._team_name}, {self._player_no})'
+        return f'RemoteAgent({self._conn.__repr__()})'
