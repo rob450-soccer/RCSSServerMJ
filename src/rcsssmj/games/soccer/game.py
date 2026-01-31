@@ -3,9 +3,10 @@ from typing import Protocol, runtime_checkable
 
 from rcsssmj.games.game import PGame
 from rcsssmj.games.soccer.field import SoccerField
-from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
 from rcsssmj.games.soccer.game_state import GameState
 from rcsssmj.games.soccer.rules import SoccerRules
+from rcsssmj.games.soccer.soccer_agent import SoccerAgent
+from rcsssmj.games.soccer.soccer_ball import SoccerBall
 from rcsssmj.games.teams import TeamSide
 
 
@@ -30,14 +31,14 @@ class PSoccerGame(PGame, Protocol):
         """The soccer ball object representation."""
 
     @property
-    def left_players(self) -> Mapping[int, SoccerPlayer]:
+    def left_players(self) -> Mapping[int, SoccerAgent]:
         """The active soccer player representations of the left team."""
 
     @property
-    def right_players(self) -> Mapping[int, SoccerPlayer]:
+    def right_players(self) -> Mapping[int, SoccerAgent]:
         """The active soccer player representations of the right team."""
 
-    def get_players(self, side: TeamSide | int) -> Mapping[int, SoccerPlayer]:
+    def get_players(self, side: TeamSide | int) -> Mapping[int, SoccerAgent]:
         """Return the active soccer player representations for the team corresponding to the given side.
 
         Parameter

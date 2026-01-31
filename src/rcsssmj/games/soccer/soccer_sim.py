@@ -11,11 +11,12 @@ from rcsssmj.agent.perception import Perception
 from rcsssmj.agents import AgentID
 from rcsssmj.games.soccer.agent.perception import GameStatePerception
 from rcsssmj.games.soccer.field import SoccerField
-from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
 from rcsssmj.games.soccer.game_state import GameState
 from rcsssmj.games.soccer.monitor.state import SoccerEnvironmentInformation, SoccerGameInformation
 from rcsssmj.games.soccer.referee import SoccerReferee
 from rcsssmj.games.soccer.rules import FIFASoccerRules, SoccerRules
+from rcsssmj.games.soccer.soccer_agent import SoccerAgent
+from rcsssmj.games.soccer.soccer_ball import SoccerBall
 from rcsssmj.games.teams import TeamSide
 from rcsssmj.mjutils import quat_from_axis_angle
 from rcsssmj.monitor.commands import MonitorCommand
@@ -67,7 +68,7 @@ class SoccerSimulation(BaseSimulation):
         self.ball: Final[SoccerBall] = SoccerBall()
         """The soccer ball representation."""
 
-        self._team_players: Final[Mapping[int, dict[int, SoccerPlayer]]] = {
+        self._team_players: Final[Mapping[int, dict[int, SoccerAgent]]] = {
             TeamSide.LEFT.value: {},
             TeamSide.RIGHT.value: {},
         }
@@ -77,18 +78,18 @@ class SoccerSimulation(BaseSimulation):
         self.referee.game = self
 
     @property
-    def left_players(self) -> Mapping[int, SoccerPlayer]:
+    def left_players(self) -> Mapping[int, SoccerAgent]:
         """The active soccer player representations of the left team."""
 
         return self._team_players[TeamSide.LEFT.value]
 
     @property
-    def right_players(self) -> Mapping[int, SoccerPlayer]:
+    def right_players(self) -> Mapping[int, SoccerAgent]:
         """The active soccer player representations of the right team."""
 
         return self._team_players[TeamSide.RIGHT.value]
 
-    def get_players(self, side: TeamSide | int) -> Mapping[int, SoccerPlayer]:
+    def get_players(self, side: TeamSide | int) -> Mapping[int, SoccerAgent]:
         """Return the active soccer player representations for the team corresponding to the given side.
 
         Parameter
@@ -106,7 +107,7 @@ class SoccerSimulation(BaseSimulation):
         return chain([self.ball], self._team_players[TeamSide.LEFT.value].values(), self._team_players[TeamSide.RIGHT.value].values())
 
     @property
-    def sim_agents(self) -> Iterator[SoccerPlayer]:
+    def sim_agents(self) -> Iterator[SoccerAgent]:
         return chain(self._team_players[TeamSide.LEFT.value].values(), self._team_players[TeamSide.RIGHT.value].values())
 
     def init(self) -> bool:
@@ -422,7 +423,7 @@ class SoccerSimulation(BaseSimulation):
         agent_id = AgentID(team_id, player_no)
 
         # append new player to team dict
-        player = SoccerPlayer(agent_id, team_name, model_spec)
+        player = SoccerAgent(agent_id, team_name, model_spec)
         self._team_players[team_id][player_no] = player
 
         # set team color and spawn position
