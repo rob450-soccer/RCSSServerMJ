@@ -3,17 +3,20 @@ from __future__ import annotations
 from typing import Final, Protocol
 
 
-class PAgent(Protocol):
-    """Protocol for agents participating in a game."""
+class PAgentParameter(Protocol):
+    """Protocol for agent parameter collections."""
 
-    def get_model_name(self) -> str:
-        """Return the name of the robot model associated with the agent."""
+    @property
+    def model_name(self) -> str:
+        """The name of the robot model associated with the agent."""
 
-    def get_team_name(self) -> str:
-        """Return the name of the team the agent belongs to."""
+    @property
+    def team_name(self) -> str:
+        """The name of the team the agent belongs to."""
 
-    def get_player_no(self) -> int:
-        """Return the player number of the agent."""
+    @property
+    def player_no(self) -> int:
+        """The player number of the agent."""
 
 
 class AgentID:

@@ -1,8 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
-from queue import Empty
-from typing import Any, Final, cast
+from collections.abc import Iterator, Sequence
+from typing import Any, Final
 
 import mujoco
 import numpy as np
@@ -22,12 +21,12 @@ from rcsssmj.agent.perception import (
     TouchPerception,
     VisionPerception,
 )
-from rcsssmj.agent.remote_agent import RemoteAgent
-from rcsssmj.agents import AgentID, PAgent
+from rcsssmj.agents import AgentID, PAgentParameter
 from rcsssmj.monitor.commands import MonitorCommand
-from rcsssmj.monitor.sim_monitor import SimMonitor
 from rcsssmj.monitor.state import SceneGraph, SimStateInformation
 from rcsssmj.resources.spec_provider import ModelSpecProvider
+from rcsssmj.sim_agent import SimAgent
+from rcsssmj.sim_object import SimObject
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +115,16 @@ class BaseSimulation(ABC):
 
         return float(self.mj_model.opt.timestep * self.n_substeps)
 
+    @property
+    @abstractmethod
+    def sim_objects(self) -> Iterator[SimObject]:
+        """Iterator over all simulation objects."""
+
+    @property
+    @abstractmethod
+    def sim_agents(self) -> Iterator[SimAgent]:
+        """Iterator over all simulation agent representation."""
+
     def kill_sim(self) -> None:
         """Kill the simulation (server)."""
 
@@ -184,6 +193,9 @@ class BaseSimulation(ABC):
         self._mj_model = self._mj_spec.compile()
         self._mj_data = mujoco.MjData(self._mj_model)
 
+        # calculate forward kinematics / dynamics of newly created world
+        mujoco.mj_forward(self._mj_model, self._mj_data)
+
         # extract visible object markers of world
         self._world_markers = [(site.name, site.name[:-10]) for site in self._mj_spec.sites if site.name.endswith('-vismarker')]
 
@@ -200,188 +212,116 @@ class BaseSimulation(ABC):
         self._mj_data = None
         self._world_markers = []
 
-    def activate_agents(self, ready_agents: Sequence[RemoteAgent]) -> tuple[list[RemoteAgent], list[RemoteAgent]]:
-        """Try activate the given list of agents.
+    def add_agents(self, params: Sequence[PAgentParameter]) -> list[SimAgent | None]:
+        """Try adding agent representations for the given list of agent params.
 
         Parameter
         ---------
-        ready_agents: Sequence[RemoteAgent]
-            The list of remote agents to activate.
+        params: Sequence[PAgentParameter]
+            The list of parameter for which to add agents.
         """
 
-        activated_agents: list[RemoteAgent] = []
-        agents_to_remove: list[RemoteAgent] = []
+        # add agents
+        sim_agents = [self._add_agent(p) for p in params]
 
-        for agent in ready_agents:
-            if self._activate_agent(agent):
-                activated_agents.append(agent)
-            else:
-                # failed to activate agent --> shutdown and remove agent
-                logger.info('Failed to activate agent %s. Shutting down agent again.', agent)
-                agent.shutdown()
-                agents_to_remove.append(agent)
-
-        if activated_agents:
+        if sim_agents:
             # recompile spec in case new agents got added
-            self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
+            self._recompile()
 
             # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
             mujoco.mj_forward(self._mj_model, self._mj_data)
 
-        return activated_agents, agents_to_remove
+        return sim_agents
 
-    def _activate_agent(self, agent: RemoteAgent) -> bool:
-        """Try to activate the given agent.
+    def _add_agent(self, params: PAgentParameter) -> SimAgent | None:
+        """Try to add an agent with the given parameter.
 
         Parameter
         ---------
-        agent: RemoteAgent
-            The agent to activate.
+        params: PAgentParameter
+            The agent parameter.
         """
 
         # try to load the robot model requested by the agent
-        robot_spec = self.spec_provider.load_robot(agent.get_model_name())
+        robot_spec = self.spec_provider.load_robot(params.model_name)
         if robot_spec is None:
             # failed to load the requested model --> report failure
-            return False
+            return None
 
         # request participation in game
-        agent_id = self._request_participation(agent, robot_spec)
-        if agent_id is None:
+        sim_agent = self._request_participation(params.team_name, params.player_no, robot_spec)
+        if sim_agent is None:
             # invalid team side -> report failure
-            return False
+            return None
 
         # append robot to world
         frame = self._mj_spec.worldbody.add_frame()
-        frame.attach_body(robot_spec.body('torso'), agent_id.prefix, '')
+        frame.attach_body(robot_spec.body('torso'), sim_agent.agent_id.prefix, '')
 
-        agent.activate(agent_id, robot_spec)
+        logger.info('Player %s #%d joined the game.', params.team_name, params.player_no)
 
-        logger.info('Player %s joined the game.', agent)
+        return sim_agent
 
-        return True
-
-    def deactivate_agents(self, agents: Sequence[RemoteAgent]) -> None:
-        """Deactivate the given list of agents.
+    def remove_agents(self, agents: Sequence[SimAgent]) -> None:
+        """Remove the given list of agents.
 
         Parameter
         ---------
-        agents: Sequence[RemoteAgent]
-            The list of agent instances to deactivate.
+        agents: Sequence[SimAgent]
+            The list of agent instances to remove.
         """
 
-        recompile_spec = False
+        if agents:
+            for agent in agents:
+                self._remove_agent(agent)
 
-        for agent in agents:
-            recompile_spec |= self._deactivate_agent(agent)
+            self._recompile()
 
-        if recompile_spec:
-            self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
-
-    def _deactivate_agent(self, agent: RemoteAgent) -> bool:
-        """Deactivate the given agent instance.
+    def _remove_agent(self, agent: SimAgent) -> None:
+        """Remove the given agent instance.
 
         Parameter
         ---------
-        agent: RemoteAgent
-            The agent to activate.
+        agent: SimAgent
+            The simulation agent to remove.
         """
 
-        # check if agent has been activated before
-        agent_id = agent.get_id()
+        # remove agent model from simulation
+        self._mj_spec.delete(self._mj_spec.body(agent.root_body_name))
 
-        if agent_id is not None:
-            # remove agent model from simulation
-            self._mj_spec.delete(self._mj_spec.body(agent_id.prefix + 'torso'))
+        # delete various components manually, as they are not automatically removed again when the root body is detached
+        # Note:
+        # Not sure if this is intentional behavior or a bug in mujoco.
+        # It's also not clear what components need to be deleted separately.
+        # The code below so far prevents any follow-up exceptions when re-attaching the same model again.
+        # But at the moment, there is no guarantee that there will be no components left in the spec that may cause some trouble at some point.
+        def del_els(el_list: list[Any]) -> None:
+            for el in el_list:
+                self._mj_spec.delete(el)
 
-            # delete various components manually, as they are not automatically removed again when the root body is detached
-            # Note:
-            # Not sure if this is intentional behavior or a bug in mujoco.
-            # It's also not clear what components need to be deleted separately.
-            # The code below so far prevents any follow-up exceptions when re-attaching the same model again.
-            # But at the moment, there is no guarantee that there will be no components left in the spec that may cause some trouble at some point.
-            def del_els(el_list: list[Any]) -> None:
-                for el in el_list:
-                    self._mj_spec.delete(el)
+        # del_els(agent.spec.cameras)
+        # del_els(agent.spec.geoms)
+        # del_els(agent.spec.lights)
+        del_els(agent.spec.materials)
+        del_els(agent.spec.meshes)
+        del_els(agent.spec.sites)
+        del_els(agent.spec.texts)
+        del_els(agent.spec.textures)
 
-            model_spec = cast(Any, agent.get_model_spec())
-            # del_els(model_spec.cameras)
-            # del_els(model_spec.geoms)
-            # del_els(model_spec.lights)
-            del_els(model_spec.materials)
-            del_els(model_spec.meshes)
-            del_els(model_spec.sites)
-            del_els(model_spec.texts)
-            del_els(model_spec.textures)
+        # remove agent from game
+        self._handle_withdrawal(agent.agent_id)
 
-            # remove agent from game
-            self._handle_withdrawal(agent_id)
+        logger.info('Player %s left the game.', agent)
 
-            logger.info('Player %s left the game.', agent)
+    def _recompile(self) -> None:
+        """Recompile spec and bind sim objects."""
 
-            return True
+        # recompile spec
+        self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
 
-        return False
-
-    def collect_actions(self, active_agents: Sequence[RemoteAgent], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
-        """Collect the actions from all active agents.
-
-        Parameter
-        ---------
-        active_agents: Sequence[RemoteAgent]
-            The list of active agents.
-
-        block: bool, default=False
-            Wait for agent actions to arrive.
-
-        timeout: float, default=5
-            The time to wait for agent actions to arrive. After this time, the agent is considered inactive and will be shutdown.
-            If timeout is a negative number, it will wait forever.
-        """
-
-        agent_actions: list[SimAction] = []
-
-        # collect agent actions and send perceptions
-        for agent in active_agents:
-            # collect all pending actions
-            action_queue = agent.get_action_queue()
-            try:
-                if block:
-                    # wait for exactly one agent action
-                    agent_actions += action_queue.get(timeout=timeout)
-                else:
-                    # fetch all currently available actions
-                    while action_queue.qsize() > 0:
-                        agent_actions += action_queue.get_nowait()
-            except Empty:
-                if block:
-                    # agent took too long to answer -> kill it
-                    logger.info('Team %s: Player %d did not respond for more than %.3f seconds. Forcing player shutdown.', agent.get_team_name(), agent.get_player_no(), timeout)
-                    agent.shutdown()
-                    continue
-
-        return agent_actions
-
-    def collect_commands(self, active_monitors: Sequence[SimMonitor]) -> list[MonitorCommand]:
-        """Collect the commands from all active monitors.
-
-        Parameter
-        ---------
-        active_monitors: Sequence[SimMonitor]
-            The list of active monitors.
-        """
-
-        monitor_commands: list[MonitorCommand] = []
-
-        for monitor in active_monitors:
-            command_queue = monitor.get_command_queue()
-            try:
-                while command_queue.qsize() > 0:
-                    monitor_commands.append(command_queue.get_nowait())
-            except Empty:
-                pass
-
-        return monitor_commands
+        # rebind objects
+        for obj in self.sim_objects:
+            obj.bind(self._mj_model, self._mj_data)
 
     def step(self, agent_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand]) -> None:
         """Perform a simulation step.
@@ -416,6 +356,10 @@ class BaseSimulation(ABC):
             The list of simulation actions.
         """
 
+        # notify simulation objects
+        for obj in self.sim_objects:
+            obj.pre_step(self._mj_model, self._mj_data)
+
         # apply agent actions
         for action in agent_actions:
             action.perform(self)
@@ -429,18 +373,19 @@ class BaseSimulation(ABC):
             The list of monitor commands.
         """
 
+        # notify simulation objects
+        for obj in self.sim_objects:
+            obj.post_step(self._mj_model, self._mj_data)
+
         # apply monitor commands
         for command in monitor_commands:
             command.perform(self)
 
-    def generate_perceptions(self, active_agents: Sequence[RemoteAgent], *, gen_vision: bool | None = None) -> None:
+    def generate_perceptions(self, *, gen_vision: bool | None = None) -> None:
         """Generate perceptions for active agents.
 
         Parameter
         ---------
-        active_agents: Sequence[RemoteAgent]
-            The list of agents considered as active in this simulation cycle.
-
         gen_vision: bool, default=None
             Generate vision perception. If None, vision is generated according to the `vision_interval` attribute.
         """
@@ -461,6 +406,9 @@ class BaseSimulation(ABC):
         if gen_vision is None:
             gen_vision = self._frame_id % self.vision_interval == 0
 
+        # fetch all active agents
+        agents = [*self.sim_agents]
+
         # generate general perceptions equal for all agents
         sim_time_perception = TimePerception('now', trunc2(self._mj_data.time))
         game_state_perception = self._generate_game_state_perception()
@@ -469,8 +417,8 @@ class BaseSimulation(ABC):
             # collect visible markers
             n_world_markers = len(self._world_markers)
             obj_markers = list(self._world_markers)
-            for player in active_agents:
-                obj_markers.extend(player.get_model_markers())
+            for player in agents:
+                obj_markers.extend(player.markers)
 
             # extract visible object positions
             n_markers = len(obj_markers)
@@ -479,17 +427,15 @@ class BaseSimulation(ABC):
                 obj_pos[:, idx] = self._mj_data.site(site[0]).xpos.astype(np.float64)
 
         # generate agent specific perceptions
-        for agent in active_agents:
+        for agent in agents:
             joint_names: list[str] = []
             joint_axs: list[float] = []
             joint_vxs: list[float] = []
             agent_perceptions: list[Perception] = [sim_time_perception, game_state_perception]
 
-            model_spec = cast(Any, agent.get_model_spec())
-            agent_id = cast(AgentID, agent.get_id())
-            prefix_length = len(agent_id.prefix)
+            prefix_length = len(agent.agent_id.prefix)
 
-            for sensor_spec in model_spec.sensors:
+            for sensor_spec in agent.spec.sensors:
                 sensor = self._mj_data.sensor(sensor_spec.name)
                 sensor_name = sensor_spec.name[prefix_length:]
 
@@ -533,7 +479,7 @@ class BaseSimulation(ABC):
             # ideal camera sensor-pipeline
             if gen_vision:
                 # fetch camera sensor site
-                camera_site = self._mj_data.site(agent_id.prefix + 'camera')
+                camera_site = self._mj_data.site(agent.agent_id.prefix + 'camera')
 
                 if camera_site is not None:
                     # fetch pose of camera site of robot model
@@ -561,11 +507,11 @@ class BaseSimulation(ABC):
 
                     # extract player object detections
                     idx = n_world_markers
-                    for player in active_agents:
-                        n_player_markers = len(player.get_model_markers())
+                    for player in agents:
+                        n_player_markers = len(player.markers)
                         player_detections = [ObjectDetection(obj_markers[i][1], azimuths[i], elevations[i], distances[i]) for i in range(idx, idx + n_player_markers) if obj_visibility[i]]
                         if player_detections:
-                            obj_detections.append(AgentDetection('P', player.get_team_name(), player.get_player_no(), player_detections))
+                            obj_detections.append(AgentDetection('P', player.team_name, player.agent_id.player_no, player_detections))
 
                         idx += n_player_markers
 
@@ -574,39 +520,10 @@ class BaseSimulation(ABC):
             # forward generated perceptions to agent instance
             agent.set_perceptions(agent_perceptions)
 
-    def send_perceptions(self, active_agents: Sequence[RemoteAgent]) -> None:
-        """Send the previously generated perceptions to active agents.
-
-        Parameter
-        ---------
-        active_agents: Sequence[RemoteAgent]
-            The list of active agents.
-        """
-
-        for agent in active_agents:
-            agent.send_perceptions()
-
-    def _generate_state_information(self) -> list[SimStateInformation]:
+    def generate_state_information(self) -> list[SimStateInformation]:
         """Generate simulation state information for updating monitor instances."""
 
         return [SceneGraph(self._mj_model, self._mj_data)]
-
-    def update_monitors(self, active_monitors: Sequence[SimMonitor]) -> None:
-        """Update active monitors.
-
-        Parameter
-        ---------
-        active_monitors: Sequence[SimMonitor]
-            The list of active monitors.
-
-        referee: SoccerReferee
-            The referee instance.
-        """
-
-        state_info = self._generate_state_information()
-
-        for monitor in active_monitors:
-            monitor.update(state_info, self._frame_id)
 
     @abstractmethod
     def _create_world(self) -> Any | None:
@@ -619,21 +536,24 @@ class BaseSimulation(ABC):
         """
 
     @abstractmethod
-    def _request_participation(self, agent: PAgent, model_spec: Any) -> AgentID | None:
+    def _request_participation(self, team_name: str, player_no: int, model_spec: Any) -> SimAgent | None:
         """Validate and add a new agent requesting to join the game.
 
         Parameter
         ---------
-        agent: PAgent
-            The agent the requests participation in the game.
+        team_name: str
+            The team name of the agent requesting participation.
+
+        player_no: int
+            The player number of the agent requesting participation.
 
         model_spec: MjSpec
             The robot model specification of the new agent.
 
         Returns
         -------
-        AgentID | None
-            The agent id identifying the new agent if participation has been accepted, None if participation of the new agent has been rejected.
+        SimAgent | None
+            The simulation agent representation identifying the new agent if participation has been accepted, None if participation of the new agent has been rejected.
         """
 
     @abstractmethod

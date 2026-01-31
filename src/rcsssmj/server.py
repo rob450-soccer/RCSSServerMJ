@@ -1,13 +1,17 @@
 import logging
 import socket
 import time
+from collections.abc import Sequence
+from queue import Empty
 from threading import Lock, Thread
 from typing import Final
 
+from rcsssmj.agent.action import SimAction
 from rcsssmj.agent.encoder import DefaultPerceptionEncoder, PerceptionEncoder
 from rcsssmj.agent.parser import ActionParser, DefaultActionParser
 from rcsssmj.agent.remote_agent import RemoteAgent, RemoteAgentState
 from rcsssmj.communication.tcp_lpm_connection import TCPLPMConnection
+from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
 from rcsssmj.monitor.parser import CommandParser, DefaultCommandParser
 from rcsssmj.monitor.sim_monitor import RemoteSimMonitor, SimMonitor, SimMonitorState
@@ -333,13 +337,13 @@ class SimServer:
             active_monitors, monitors_to_remove = self._filter_monitors()
 
             # handle disconnected agents
-            self.sim.deactivate_agents(disconnected_agents)
+            self._deactivate_agents(disconnected_agents)
 
             # handle ready agents
-            activated_agents, deactivated_agents = self.sim.activate_agents(ready_agents)
+            activated_agents, deactivated_agents = self._activate_agents(ready_agents)
 
             # generate perceptions
-            self.sim.generate_perceptions(active_agents + activated_agents)
+            self.sim.generate_perceptions()
 
             # sleep to match simulation interval
             if self.real_time:
@@ -348,19 +352,19 @@ class SimServer:
 
             # collect agent actions
             # Note: Actions need to be collected before sending perceptions to agents in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
-            agent_actions = self.sim.collect_actions(active_agents, block=self.sync_mode)
+            agent_actions = self._collect_actions(active_agents, block=self.sync_mode)
 
             # send perceptions
-            self.sim.send_perceptions(active_agents + activated_agents)
+            self._send_perceptions(*active_agents, *activated_agents)
 
             # collect monitor commands
-            monitor_commands = self.sim.collect_commands(active_monitors)
+            monitor_commands = self._collect_commands(active_monitors)
 
             # progress simulation
             self.sim.step(agent_actions, monitor_commands)
 
             # update connected monitors
-            self.sim.update_monitors(active_monitors)
+            self._update_monitors(active_monitors)
 
             # TODO: log monitor message to simulator log
             # TODO: log agent perceptions and actions to agent logs
@@ -388,7 +392,7 @@ class SimServer:
             active_monitors, monitors_to_remove = self._filter_monitors()
 
             # handle disconnected agents
-            self.sim.deactivate_agents(disconnected_agents)
+            self._deactivate_agents(disconnected_agents)
 
             # sleep to match simulation interval
             if self.real_time:
@@ -396,24 +400,23 @@ class SimServer:
                 cycle_start = time.time()
 
             # Note: Actions need to be collected before sending perceptions to agents in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
-            agent_actions = self.sim.collect_actions(active_agents, block=self.sync_mode)
+            agent_actions = self._collect_actions(active_agents, block=self.sync_mode)
 
             # collect monitor commands
-            monitor_commands = self.sim.collect_commands(active_monitors)
+            monitor_commands = self._collect_commands(active_monitors)
 
             # progress simulation
             self.sim.step(agent_actions, monitor_commands)
 
             # handle ready agents
-            activated_agents, deactivated_agents = self.sim.activate_agents(ready_agents)
-            active_agents.extend(activated_agents)
+            activated_agents, deactivated_agents = self._activate_agents(ready_agents)
 
             # Note: In sequential mode, perceptions should ideally be sent directly after the simulation step to give the agents as much time as possible, while the server notifies monitors, etc.
-            self.sim.generate_perceptions(active_agents)
-            self.sim.send_perceptions(active_agents)
+            self.sim.generate_perceptions()
+            self._send_perceptions(*active_agents, *activated_agents)
 
             # update connected monitors
-            self.sim.update_monitors(active_monitors)
+            self._update_monitors(active_monitors)
 
             # TODO: log monitor message to simulator log
             # TODO: log agent perceptions and actions to agent logs
@@ -422,42 +425,8 @@ class SimServer:
             self._remove_agents(*disconnected_agents, *deactivated_agents)
             self._remove_monitors(*monitors_to_remove)
 
-    def _remove_agents(self, *agents: RemoteAgent) -> None:
-        """Remove the given agents from the simulation.
-
-        Note:
-        This method will not automatically deactivate the given agents.
-        Make sure to deactivate the agent instances before calling this method.
-
-        Parameter
-        ---------
-        *agents: RemoteAgent
-            The agent instances to remove.
-        """
-
-        with self._mutex:
-            for agent in agents:
-                self._agents.remove(agent)
-
-    def _remove_monitors(self, *monitors: SimMonitor) -> None:
-        """Remove the given monitors from the simulation.
-
-        Note:
-        This method will not automatically deactivate the given monitors.
-        Make sure to shutdown the monitor instances before calling this method.
-
-        Parameter
-        ---------
-        *monitors: SimMonitor
-            The monitor instances to remove.
-        """
-
-        with self._mutex:
-            for monitor in monitors:
-                self._monitors.remove(monitor)
-
     def _filter_agents(self) -> tuple[list[RemoteAgent], list[RemoteAgent], list[RemoteAgent], list[RemoteAgent]]:
-        """Filter simulation agents by state.
+        """Filter remote agents by state.
 
         Returns
         -------
@@ -481,7 +450,7 @@ class SimServer:
 
         with self._mutex:
             for agent in self._agents:
-                state = agent.get_state()
+                state = agent.state
                 if state == RemoteAgentState.INIT:
                     connected_agents.append(agent)
                 elif state == RemoteAgentState.READY:
@@ -493,6 +462,120 @@ class SimServer:
                     disconnected_agents.append(agent)
 
         return connected_agents, ready_agents, active_agents, disconnected_agents
+
+    def _activate_agents(self, agents: Sequence[RemoteAgent]) -> tuple[list[RemoteAgent], list[RemoteAgent]]:
+        """Try activate the given list of remote agents.
+
+        Parameter
+        ---------
+        ready_agents: Sequence[RemoteAgent]
+            The list of remote agents to activate.
+        """
+
+        activated_agents: list[RemoteAgent] = []
+        agents_to_remove: list[RemoteAgent] = []
+
+        if agents:
+            # add agents
+            sim_agents = self.sim.add_agents(agents)
+
+            for agent, sim_agent in zip(agents, sim_agents, strict=True):
+                if sim_agent is not None:
+                    # simulation agent successfully created
+                    logger.info('Agent %s activated.', agent)
+                    agent.activate(sim_agent)
+                    activated_agents.append(agent)
+                else:
+                    # failed to create simulation agent --> shutdown and remove agent
+                    logger.info('Failed to activate agent %s. Shutting down agent again.', agent)
+                    agent.shutdown()
+                    agents_to_remove.append(agent)
+
+        return activated_agents, agents_to_remove
+
+    def _deactivate_agents(self, agents: Sequence[RemoteAgent]) -> None:
+        """Deactivate the given list of remote agents.
+
+        Parameter
+        ---------
+        agents: Sequence[RemoteAgent]
+            The list of remote agent instances to deactivate.
+        """
+
+        # extract simulation agents to remove
+        sim_agents = [sim_agent for sim_agent in (agent.sim_agent for agent in agents) if sim_agent is not None]
+
+        if sim_agents:
+            self.sim.remove_agents(sim_agents)
+
+    def _send_perceptions(self, *agents: RemoteAgent) -> None:
+        """Send the previously generated perceptions to the given agents.
+
+        Parameter
+        ---------
+        *agents: RemoteAgent
+            The remote agent instances to which to send perception information.
+        """
+
+        for agent in agents:
+            agent.send_perceptions()
+
+    def _collect_actions(self, agents: Sequence[RemoteAgent], *, block: bool = False, timeout: float = 5) -> list[SimAction]:
+        """Collect the actions from all active agents.
+
+        Parameter
+        ---------
+        agents: Sequence[SimAgent]
+            The list of active agents.
+
+        block: bool, default=False
+            Wait for agent actions to arrive.
+
+        timeout: float, default=5
+            The time to wait for agent actions to arrive. After this time, the agent is considered inactive and will be shutdown.
+            If timeout is a negative number, it will wait forever.
+        """
+
+        agent_actions: list[SimAction] = []
+
+        # collect agent actions and send perceptions
+        for agent in agents:
+            # collect all pending actions
+            try:
+                if block:
+                    # wait for exactly one agent action
+                    agent_actions += agent.action_queue.get(timeout=timeout)
+                else:
+                    # fetch all currently available actions
+                    while agent.action_queue.qsize() > 0:
+                        agent_actions += agent.action_queue.get_nowait()
+            except Empty:
+                if block:
+                    # agent took too long to answer -> kill it
+                    logger.info('Team %s: Agent %d did not respond for more than %.3f seconds. Forcing agent shutdown.', agent.team_name, agent.player_no, timeout)
+                    agent.shutdown()
+                    continue
+
+        return agent_actions
+
+    def _remove_agents(self, *agents: RemoteAgent) -> None:
+        """Remove the given agents from the simulation.
+
+        Note:
+        This method will not automatically deactivate the given agents.
+        Make sure to deactivate the agent instances before calling this method.
+
+        Parameter
+        ---------
+        *agents: SimAgent
+            The agent instances to remove.
+        """
+
+        with self._mutex:
+            for agent in agents:
+                self._agents.remove(agent)
+
+                logger.info('Agent %s removed.', agent)
 
     def _filter_monitors(self) -> tuple[list[SimMonitor], list[SimMonitor]]:
         """Filter simulation monitors by state.
@@ -517,3 +600,60 @@ class SimServer:
                     inactive_monitors.append(monitor)
 
         return active_monitors, inactive_monitors
+
+    def _collect_commands(self, monitors: Sequence[SimMonitor]) -> list[MonitorCommand]:
+        """Collect the commands from all active monitors.
+
+        Parameter
+        ---------
+        monitors: Sequence[SimMonitor]
+            The list of active monitors.
+        """
+
+        monitor_commands: list[MonitorCommand] = []
+
+        for monitor in monitors:
+            command_queue = monitor.get_command_queue()
+            try:
+                while command_queue.qsize() > 0:
+                    monitor_commands.append(command_queue.get_nowait())
+            except Empty:
+                pass
+
+        return monitor_commands
+
+    def _update_monitors(self, monitors: Sequence[SimMonitor]) -> None:
+        """Update active monitors.
+
+        Parameter
+        ---------
+        monitors: Sequence[SimMonitor]
+            The list of active monitors.
+
+        referee: SoccerReferee
+            The referee instance.
+        """
+
+        state_info = self.sim.generate_state_information()
+
+        for monitor in monitors:
+            monitor.update(state_info, self.sim.frame_id)
+
+    def _remove_monitors(self, *monitors: SimMonitor) -> None:
+        """Remove the given monitors from the simulation.
+
+        Note:
+        This method will not automatically deactivate the given monitors.
+        Make sure to shutdown the monitor instances before calling this method.
+
+        Parameter
+        ---------
+        *monitors: SimMonitor
+            The monitor instances to remove.
+        """
+
+        with self._mutex:
+            for monitor in monitors:
+                self._monitors.remove(monitor)
+
+                logger.info('Monitor %s removed.', monitor)

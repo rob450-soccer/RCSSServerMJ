@@ -1,13 +1,14 @@
 import contextlib
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from itertools import chain
 from math import degrees, pi
 from typing import Any, Final
 
 import mujoco
 
 from rcsssmj.agent.perception import Perception
-from rcsssmj.agents import AgentID, PAgent
+from rcsssmj.agents import AgentID
 from rcsssmj.games.soccer.agent.perception import GameStatePerception
 from rcsssmj.games.soccer.field import SoccerField
 from rcsssmj.games.soccer.game_object import SoccerBall, SoccerPlayer
@@ -19,6 +20,8 @@ from rcsssmj.games.teams import TeamSide
 from rcsssmj.mjutils import place_robot_3d, quat_from_axis_angle
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.state import SimStateInformation
+from rcsssmj.sim_agent import SimAgent
+from rcsssmj.sim_object import SimObject
 from rcsssmj.simulation import BaseSimulation
 
 logger = logging.getLogger(__name__)
@@ -98,13 +101,13 @@ class SoccerSimulation(BaseSimulation):
 
         return self._team_players[side]
 
-    def get_all_players(self) -> Sequence[SoccerPlayer]:
-        """Return all active soccer player representations (from left and right team)."""
+    @property
+    def sim_objects(self) -> Iterator[SimObject]:
+        return chain([self.ball], self._team_players[TeamSide.LEFT.value].values(), self._team_players[TeamSide.RIGHT.value].values())
 
-        left_players = list(self._team_players[TeamSide.LEFT.value].values())
-        right_players = list(self._team_players[TeamSide.RIGHT.value].values())
-
-        return left_players + right_players
+    @property
+    def sim_agents(self) -> Iterator[SoccerPlayer]:
+        return chain(self._team_players[TeamSide.LEFT.value].values(), self._team_players[TeamSide.RIGHT.value].values())
 
     def init(self) -> bool:
         # forward init call to parent
@@ -117,7 +120,7 @@ class SoccerSimulation(BaseSimulation):
         self._team_players[TeamSide.RIGHT.value].clear()
 
         # initialize ball
-        self.ball.activate(self._mj_spec.body('ball'))
+        self.ball.init(self._mj_spec, self._mj_model, self._mj_data)
 
         # initialize referee
         self.referee.reset()
@@ -394,32 +397,33 @@ class SoccerSimulation(BaseSimulation):
 
         return world_spec
 
-    def _request_participation(self, agent: PAgent, model_spec: Any) -> AgentID | None:
+    def _request_participation(self, team_name: str, player_no: int, model_spec: Any) -> SimAgent | None:
         # check player number
-        if agent.get_player_no() > self.rules.max_player_no:
+        if player_no > self.rules.max_player_no:
             return None
 
         # update known team names
-        self.game_state.update_team_names(agent.get_team_name())
+        self.game_state.update_team_names(team_name)
 
         # fetch team side for agent
-        team_id = self.game_state.get_team_side(agent.get_team_name()).value
+        team_id = self.game_state.get_team_side(team_name).value
 
         if not TeamSide.is_valid(team_id):
             return None
 
         # check if a player with the same player number of the agent is already present in the game
-        if agent.get_player_no() in self._team_players[team_id]:
+        if player_no in self._team_players[team_id]:
             return None
 
         # check if the new player would exceed the maximum number of allowed players per team
         if len(self._team_players[team_id]) >= self.rules.max_team_size:
             return None
 
-        agent_id = AgentID(team_id, agent.get_player_no())
+        agent_id = AgentID(team_id, player_no)
 
         # append new player to team dict
-        self._team_players[team_id][agent.get_player_no()] = SoccerPlayer(agent_id, model_spec)
+        player = SoccerPlayer(agent_id, team_name, model_spec)
+        self._team_players[team_id][player_no] = player
 
         # set team color and spawn position
         model_spec.material('team').rgba = [0, 0, 1, 1] if team_id == TeamSide.LEFT.value else [1, 0, 0, 1]
@@ -432,7 +436,7 @@ class SoccerSimulation(BaseSimulation):
 
         logger.debug('Spawn team #%d player #%02d @ (%.3f %.3f)', agent_id.team_id, agent_id.player_no, root_body.pos[0], root_body.pos[1])
 
-        return agent_id
+        return player
 
     def _handle_withdrawal(self, agent_id: AgentID) -> None:
         if TeamSide.is_valid(agent_id.team_id):
@@ -440,15 +444,6 @@ class SoccerSimulation(BaseSimulation):
                 del self._team_players[agent_id.team_id][agent_id.player_no]
 
     def _post_step(self, monitor_commands: Sequence[MonitorCommand]) -> None:
-        # update game objects
-        self.ball.update(self._mj_model, self._mj_data)
-
-        for p in self._team_players[TeamSide.LEFT.value].values():
-            p.update(self._mj_model, self._mj_data)
-
-        for p in self._team_players[TeamSide.RIGHT.value].values():
-            p.update(self._mj_model, self._mj_data)
-
         # forward to parent
         super()._post_step(monitor_commands)
 
@@ -462,14 +457,7 @@ class SoccerSimulation(BaseSimulation):
         """Relocate objects as requested by referee."""
 
         # relocate ball
-        if self.ball.place_pos is not None:
-            pos = (self.ball.place_pos[0], self.ball.place_pos[1], 0.12)
-            rot = (1, 0, 0, 0)
-
-            place_robot_3d('ball-', self._mj_model, self._mj_data, pos, rot)
-            self.ball.last_position = pos
-            self.ball.position = pos
-            self.ball.place_pos = None
+        self.ball.relocate()
 
         # relocate players
         for players in self._team_players.values():
@@ -479,7 +467,6 @@ class SoccerSimulation(BaseSimulation):
                     quat = (1.0, 0.0, 0.0, 0.0) if player.place_quat is None else player.place_quat
 
                     place_robot_3d(player.agent_id.prefix, self._mj_model, self._mj_data, pos, quat)
-                    player.position = pos
                     player.place_pos = None
                     player.place_quat = None
 
@@ -493,8 +480,8 @@ class SoccerSimulation(BaseSimulation):
             score_right=self.game_state.get_team_score(TeamSide.RIGHT),
         )
 
-    def _generate_state_information(self) -> list[SimStateInformation]:
-        state_info = super()._generate_state_information()
+    def generate_state_information(self) -> list[SimStateInformation]:
+        state_info = super().generate_state_information()
 
         state_info.insert(
             0,

@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Protocol, runtime_checkable
 
 from rcsssmj.games.game import PGame
@@ -45,6 +45,3 @@ class PSoccerGame(PGame, Protocol):
         side: TeamSide | int
             The team side or side id for which to return the players.
         """
-
-    def get_all_players(self) -> Sequence[SoccerPlayer]:
-        """Return all active soccer player representations (from left and right team)."""

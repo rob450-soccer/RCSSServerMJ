@@ -85,8 +85,8 @@ class SoccerReferee:
 
         self._did_act = True
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.THROW_IN_LEFT, PlayMode.THROW_IN_RIGHT)
-        y = self.game.field.field_area.min_y if self.game.ball.position[1] < 0 else self.game.field.field_area.max_y
-        self.game.ball.place_pos = (self.game.ball.position[0], y)
+        y = self.game.field.field_area.min_y if self.game.ball.xpos[1] < 0 else self.game.field.field_area.max_y
+        self.game.ball.place_pos = (self.game.ball.xpos[0], y)
         self.game.ball.reset_contacts()
         self._agent_na_touch_ball = None
         self._team_na_score = None
@@ -103,7 +103,7 @@ class SoccerReferee:
         self._did_act = True
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.CORNER_KICK_LEFT, PlayMode.CORNER_KICK_RIGHT)
         x = self.game.field.field_area.max_x if team_side == TeamSide.LEFT else self.game.field.field_area.min_x
-        y = self.game.field.field_area.min_y if self.game.ball.position[1] < 0 else self.game.field.field_area.max_y
+        y = self.game.field.field_area.min_y if self.game.ball.xpos[1] < 0 else self.game.field.field_area.max_y
         self.game.ball.place_pos = (x, y)
         self.game.ball.reset_contacts()
         self._agent_na_touch_ball = None
@@ -171,7 +171,7 @@ class SoccerReferee:
 
         self._did_act = True
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.FREE_KICK_LEFT, PlayMode.FREE_KICK_RIGHT)
-        self.game.ball.place_pos = self.game.ball.position[0:2]
+        self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1])
         self.game.ball.reset_contacts()
         self._agent_na_touch_ball = None
         self._team_na_score = team_side
@@ -187,7 +187,7 @@ class SoccerReferee:
 
         self._did_act = True
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.DIRECT_FREE_KICK_LEFT, PlayMode.DIRECT_FREE_KICK_RIGHT)
-        self.game.ball.place_pos = self.game.ball.position[0:2]
+        self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1])
         self.game.ball.reset_contacts()
         self._agent_na_touch_ball = None
         self._team_na_score = None
@@ -232,7 +232,7 @@ class SoccerReferee:
         """
 
         self._did_act = True
-        self.game.ball.place_pos = self.game.ball.position[0:2] if pos is None else pos
+        self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1]) if pos is None else pos
         # TODO: cause relocation of all agents nearby the ball (within a radius defined here)
 
         self.game.game_state.set_play_mode(PlayMode.PLAY_ON)
@@ -338,7 +338,7 @@ class SoccerReferee:
             return
 
         # check left goal
-        if self.game.field.left_goal_box.contains(self.game.ball.position[0], self.game.ball.position[1], self.game.ball.position[2]):
+        if self.game.field.left_goal_box.contains(self.game.ball.xpos[0], self.game.ball.xpos[1], self.game.ball.xpos[2]):
             if pm == PlayMode.GOAL_KICK_LEFT:
                 # drop ball at a corner of the left goalie area
                 self.drop_ball((self.game.field.left_goalie_area.max_x, self.game.field.left_goalie_area.max_y))
@@ -349,7 +349,7 @@ class SoccerReferee:
             return
 
         # check right goal
-        if self.game.field.right_goal_box.contains(self.game.ball.position[0], self.game.ball.position[1], self.game.ball.position[2]):
+        if self.game.field.right_goal_box.contains(self.game.ball.xpos[0], self.game.ball.xpos[1], self.game.ball.xpos[2]):
             if pm == PlayMode.GOAL_KICK_RIGHT:
                 # drop ball at a corner of the left goalie area
                 self.drop_ball((self.game.field.right_goalie_area.min_x, self.game.field.right_goalie_area.max_y))
@@ -360,25 +360,25 @@ class SoccerReferee:
             return
 
         # check if the ball left the field
-        if not self.game.field.field_area.contains(self.game.ball.position[0], self.game.ball.position[1]):
+        if not self.game.field.field_area.contains(self.game.ball.xpos[0], self.game.ball.xpos[1]):
             agent_contact = self.game.ball.get_most_recent_contact()
             last_team_contact = TeamSide.UNKNOWN if agent_contact is None else TeamSide.from_id(agent_contact.team_id)
 
-            if self.game.ball.position[0] < self.game.field.field_area.min_x:
+            if self.game.ball.xpos[0] < self.game.field.field_area.min_x:
                 # corner-kick right / goal-kick left
                 if last_team_contact == TeamSide.LEFT:
                     self.corner_kick(TeamSide.RIGHT)
                 else:
                     self.goal_kick(TeamSide.LEFT)
 
-            elif self.game.ball.position[0] > self.game.field.field_area.max_x:
+            elif self.game.ball.xpos[0] > self.game.field.field_area.max_x:
                 # corner-kick left / goal-kick right
                 if last_team_contact == TeamSide.RIGHT:
                     self.corner_kick(TeamSide.LEFT)
                 else:
                     self.goal_kick(TeamSide.RIGHT)
 
-            # elif self.game.ball.position[1] < -self.game.field.field_area.min_y or self.game.ball.position[1] > self.game.field.field_area.max_y:
+            # elif self.game.ball.xpos[1] < -self.game.field.field_area.min_y or self.game.ball.xpos[1] > self.game.field.field_area.max_y:
             else:
                 # throw-in
                 self.throw_in(TeamSide.get_opposing_side(last_team_contact))
@@ -386,8 +386,8 @@ class SoccerReferee:
             return
 
         # check if ball left the goalie area on goal-kick
-        if (pm == PlayMode.GOAL_KICK_LEFT and not self.game.field.left_goalie_area.contains(self.game.ball.position[0], self.game.ball.position[1])) or (
-            pm == PlayMode.GOAL_KICK_RIGHT and not self.game.field.right_goalie_area.contains(self.game.ball.position[0], self.game.ball.position[1])
+        if (pm == PlayMode.GOAL_KICK_LEFT and not self.game.field.left_goalie_area.contains(self.game.ball.xpos[0], self.game.ball.xpos[1])) or (
+            pm == PlayMode.GOAL_KICK_RIGHT and not self.game.field.right_goalie_area.contains(self.game.ball.xpos[0], self.game.ball.xpos[1])
         ):
             self.play_on()
             return
@@ -503,7 +503,7 @@ class KickChallengeReferee(SoccerReferee):
 
         # calculate challenge score
         if self.game.game_state.get_play_mode() != PlayMode.GAME_OVER:
-            score = int((self.game.ball.position[0] - abs(self.game.ball.position[1])) * 100)
+            score = int((self.game.ball.xpos[0] - abs(self.game.ball.xpos[1])) * 100)
             self.game.game_state.set_score(TeamSide.LEFT, score)
 
     def _check_fouls(self) -> None:

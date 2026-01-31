@@ -3,14 +3,13 @@ from collections.abc import Sequence
 from enum import Enum
 from queue import Queue
 from threading import Thread
-from typing import Any, cast
+from typing import cast
 
 from rcsssmj.agent.action import SimAction
 from rcsssmj.agent.encoder import PerceptionEncoder
 from rcsssmj.agent.parser import ActionParser
-from rcsssmj.agent.perception import Perception
-from rcsssmj.agents import AgentID
 from rcsssmj.communication.connection import PConnection
+from rcsssmj.sim_agent import SimAgent
 
 logger = logging.getLogger(__name__)
 
@@ -61,17 +60,8 @@ class RemoteAgent:
         self._player_no: int = -1
         """The player number."""
 
-        self._agent_id: AgentID | None = None
-        """Unique identifier in the simulation associated with this agent."""
-
-        self._model_spec: Any | None = None
-        """The robot model specification."""
-
-        self._model_markers: Sequence[tuple[str, str]] = []
-        """The visible markers of the robot model."""
-
-        self._perceptions: Sequence[Perception] = []
-        """The current perceptions of the agent."""
+        self._sim_agent: SimAgent | None = None
+        """The simulation agent instance associated with this remote agent."""
 
         self._action_queue: Queue[Sequence[SimAction]] = Queue()
         """The queue to which incoming agent actions are forwarded."""
@@ -91,56 +81,50 @@ class RemoteAgent:
         # start receive loop
         self._receive_thread.start()
 
-    def get_state(self) -> RemoteAgentState:
-        """Return the current agent state."""
+    @property
+    def state(self) -> RemoteAgentState:
+        """The current agent state."""
 
         return self._state
 
-    def get_model_name(self) -> str:
-        """Return the name of the robot model this agent has selected."""
+    @property
+    def model_name(self) -> str:
+        """The name of the robot model this agent has selected."""
 
         return self._model_name
 
-    def get_team_name(self) -> str:
-        """Return the name of the team this agent belongs to."""
+    @property
+    def team_name(self) -> str:
+        """The name of the team this agent belongs to."""
 
         return self._team_name
 
-    def get_player_no(self) -> int:
-        """Return the player number of this agent."""
+    @property
+    def player_no(self) -> int:
+        """The player number of this agent."""
 
         return self._player_no
 
-    def get_id(self) -> AgentID | None:
-        """Return the unique id associated with this agent (if existing)."""
+    @property
+    def sim_agent(self) -> SimAgent | None:
+        """The simulation agent instance associated with this remote agent (if existing)."""
 
-        return self._agent_id
+        return self._sim_agent
 
-    def get_model_spec(self) -> Any | None:
-        """Return the robot model specification associated with this agent."""
-
-        return self._model_spec
-
-    def get_model_markers(self) -> Sequence[tuple[str, str]]:
-        """Return the list of visual markers of the robot model associated with this agent."""
-
-        return self._model_markers
-
-    def get_action_queue(self) -> Queue[Sequence[SimAction]]:
-        """Return the action queue associated with this agent."""
+    @property
+    def action_queue(self) -> Queue[Sequence[SimAction]]:
+        """The action queue associated with this remote agent."""
 
         return self._action_queue
 
-    def activate(self, agent_id: AgentID, spec: Any) -> None:
+    def activate(self, agent: SimAgent) -> None:
         """Activate the agent.
 
         This method is called by the main simulation loop.
         """
 
         if self._state == RemoteAgentState.READY:
-            self._agent_id = agent_id
-            self._model_spec = spec
-            self._model_markers = [(site.name, ''.join(site.name.split('-')[3:-1])) for site in spec.sites if site.name.endswith('-vismarker')]
+            self._sim_agent = agent
 
             self._state = RemoteAgentState.ACTIVE
 
@@ -158,27 +142,17 @@ class RemoteAgent:
         if wait:
             self._receive_thread.join()
 
-    def set_perceptions(self, perceptions: Sequence[Perception]) -> None:
-        """Set the perceptions of the agent for this simulation cycle.
-
-        This method is called by the main simulation loop.
-
-        Parameter
-        ---------
-        perceptions: Sequence[Perception]
-            The list of perceptions of the agent for this simulation cycle.
-        """
-
-        # buffer perception
-        self._perceptions = perceptions
-
     def send_perceptions(self) -> None:
         if not self._conn.is_active():
             # skip sending perception as the agent connection is already closed
             return
 
+        if self._sim_agent is None:
+            # remote agent not registered to a simulation, yet
+            return
+
         # encode perceptions message
-        msg = self._encoder.encode(self._perceptions)
+        msg = self._encoder.encode(self._sim_agent.perceptions)
         if msg is None:
             # encoding failed or resulted in an empty message
             logger.warning('Perception message encoding for %s %d failed!', self._team_name, self._player_no)
@@ -221,7 +195,7 @@ class RemoteAgent:
 
             elif self._state == RemoteAgentState.ACTIVE:
                 # agent is in ACTIVE state -> process action message
-                actions = self._parser.parse_action(msg, cast(AgentID, self._agent_id).prefix)
+                actions = self._parser.parse_action(msg, cast(SimAgent, self._sim_agent).agent_id.prefix)
 
                 # forward action
                 self._action_queue.put(actions)
