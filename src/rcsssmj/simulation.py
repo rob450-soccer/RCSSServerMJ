@@ -228,9 +228,6 @@ class BaseSimulation(ABC):
             # recompile spec in case new agents got added
             self._recompile()
 
-            # calculate forward kinematics / dynamics of newly added robot models (without progressing the time)
-            mujoco.mj_forward(self._mj_model, self._mj_data)
-
         return sim_agents
 
     def _add_agent(self, params: PAgentParameter) -> SimAgent | None:
@@ -318,6 +315,9 @@ class BaseSimulation(ABC):
 
         # recompile spec
         self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
+
+        # calculate forward kinematics / dynamics
+        mujoco.mj_forward(self._mj_model, self._mj_data)
 
         # rebind objects
         for obj in self.sim_objects:
