@@ -1,0 +1,85 @@
+from typing import Protocol, runtime_checkable
+
+from rcsssmj.games.teams import TeamSide
+from rcsssmj.sim.sim_interfaces import PSimActionInterface, PSimCommandInterface
+
+
+@runtime_checkable
+class PSoccerSimActionInterface(PSimActionInterface, Protocol):
+    """Protocol for a soccer action interface."""
+
+    def beam_agent(self, actuator_name: str, beam_pose: tuple[float, float, float]) -> None:
+        """Perform a beam action for the agent posing the given effector.
+
+        Parameter
+        ---------
+        actuator_name: str
+            The name of the beam actuator.
+
+        beam_pose: tuple[float, float, float]
+            The desired 2D beam pose (x, y, theta).
+            Theta is given in radians.
+        """
+
+
+@runtime_checkable
+class PSoccerSimCommandInterface(PSimCommandInterface, Protocol):
+    """Protocol for the soccer command interface."""
+
+    def request_kick_off(self, team_side: TeamSide | int) -> None:
+        """Instruct kickoff for the given team.
+
+        Parameter
+        ---------
+        team_side: TeamSide
+            The team side for which to give the kick off.
+        """
+
+    def request_drop_ball(self, pos: tuple[float, float] | None = None) -> None:
+        """Drop the ball at the specified position and instruct the normal progressing of the game.
+
+        Parameter
+        ---------
+        pos: tuple[float, float] | None, default=None
+            The position at which to drop the ball or none, to drop it at its current location.
+        """
+
+    def request_place_ball(
+        self,
+        pos: tuple[float, float, float],
+        vel: tuple[float, float, float] | None = None,
+    ) -> None:
+        """Place the ball at the specified position.
+
+        Parameter
+        ---------
+        pos: tuple[float, float, float]
+            The position at which to place the ball.
+
+        vel: tuple[float, float, float] | None, default=None
+            The ball velocity.
+        """
+
+    def request_place_player(
+        self,
+        player_id: int,
+        team_name: str,
+        pos: tuple[float, float, float],
+        quat: tuple[float, float, float, float] | None = None,
+    ) -> None:
+        """Place the specified player at the specified position.
+
+        Parameter
+        ---------
+        player_id: int
+            The unique id of the player in its team.
+
+        team_name: str
+            The name of the team the player plays in or "Left" or "Right" for the left or the right team.
+
+        pos: tuple[float, float, float]
+            The position at which to place the player.
+
+        quat: tuple[float, float, float, float] | None, default=None
+            The 3D rotation quaternion of the torso.
+        """

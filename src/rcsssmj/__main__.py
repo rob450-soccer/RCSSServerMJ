@@ -3,11 +3,11 @@ import logging
 import signal
 from types import FrameType
 
-from rcsssmj.games.soccer.field import SoccerFieldVersions, create_soccer_field
-from rcsssmj.games.soccer.referee import SoccerReferee
-from rcsssmj.games.soccer.rules import SoccerRuleBooks, create_soccer_rule_book
-from rcsssmj.games.soccer.soccer_server import SoccerSimServer
-from rcsssmj.games.soccer.soccer_sim import SoccerSimulation
+from rcsssmj.games.soccer.server.soccer_server import SoccerSimServer
+from rcsssmj.games.soccer.sim.soccer_referee import SoccerReferee
+from rcsssmj.games.soccer.sim.soccer_sim import SoccerSimulation
+from rcsssmj.games.soccer.soccer_fields import SoccerFieldVersions, create_soccer_field
+from rcsssmj.games.soccer.soccer_rules import SoccerRuleBooks, create_soccer_rule_book
 
 # ---------- LOGGING CONFIG ----------
 # console handler

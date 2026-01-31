@@ -3,7 +3,7 @@
 Simulation Server
 =================
 
-The simulation server (:py:class:`SimServer <rcsssmj.simulation.SimServer>`) is responsible for running the main simulation loop.
+The simulation server (:py:class:`SimServer <rcsssmj.server.SimServer>`) is responsible for running the main simulation loop.
 It periodically sends sensor messages to connected agents and collects corresponding actions in each simulation cycle.
 Similarly, it sends the simulation state to connected monitors and forwards monitor commands to the game director (referee).
 

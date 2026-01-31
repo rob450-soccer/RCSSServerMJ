@@ -6,10 +6,10 @@ from typing import Any
 import glfw
 import mujoco
 
-from rcsssmj.games.soccer.monitor.command import DropBallCommand, KickOffCommand
-from rcsssmj.games.soccer.monitor.state import SoccerEnvironmentInformation, SoccerGameInformation
-from rcsssmj.monitor.sim_monitor import SimMonitor, SimMonitorState
-from rcsssmj.monitor.state import SceneGraph, SimStateInformation
+from rcsssmj.games.soccer.sim.soccer_commands import DropBallCommand, KickOffCommand
+from rcsssmj.games.soccer.sim.soccer_state_info import SoccerEnvironmentInformation, SoccerGameInformation
+from rcsssmj.server.remote_monitor import RemoteMonitorState, SimMonitor
+from rcsssmj.sim.state_info import SceneGraph, SimStateInformation
 
 try:
     from OpenGL import GL
@@ -179,7 +179,7 @@ class MujocoMonitor(SimMonitor):
     def render(self, data: Any) -> None:
         """Render function."""
 
-        if self._state == SimMonitorState.SHUTDOWN:
+        if self._state == RemoteMonitorState.SHUTDOWN:
             # prevent rendering after shutdown
             return
 
