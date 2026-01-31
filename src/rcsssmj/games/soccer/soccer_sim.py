@@ -17,7 +17,7 @@ from rcsssmj.games.soccer.monitor.state import SoccerEnvironmentInformation, Soc
 from rcsssmj.games.soccer.referee import SoccerReferee
 from rcsssmj.games.soccer.rules import FIFASoccerRules, SoccerRules
 from rcsssmj.games.teams import TeamSide
-from rcsssmj.mjutils import place_robot_3d, quat_from_axis_angle
+from rcsssmj.mjutils import quat_from_axis_angle
 from rcsssmj.monitor.commands import MonitorCommand
 from rcsssmj.monitor.state import SimStateInformation
 from rcsssmj.sim_agent import SimAgent
@@ -462,13 +462,7 @@ class SoccerSimulation(BaseSimulation):
         # relocate players
         for players in self._team_players.values():
             for player in players.values():
-                if player.place_pos is not None:
-                    pos = (player.place_pos[0], player.place_pos[1], player.place_pos[2])
-                    quat = (1.0, 0.0, 0.0, 0.0) if player.place_quat is None else player.place_quat
-
-                    place_robot_3d(player.agent_id.prefix, self._mj_model, self._mj_data, pos, quat)
-                    player.place_pos = None
-                    player.place_quat = None
+                player.relocate()
 
     def _generate_game_state_perception(self) -> Perception:
         return GameStatePerception(
@@ -526,16 +520,21 @@ class SoccerSimulation(BaseSimulation):
             msg = 'Invalid team!'
             raise ValueError(msg)
 
+        player = self._team_players[agent_id.team_id].get(agent_id.player_no)
+        if player is None:
+            return
+
         x_factor = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
         theta_shift = 0 if agent_id.team_id == TeamSide.LEFT.value else pi
-        pose = (abs(beam_pose[0]) * x_factor, beam_pose[1], beam_pose[2] + theta_shift)
 
-        logger.debug('Beam Team #%d Player #%02d to (%.3f, %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pose[0], pose[1], degrees(pose[2]))
+        pos = (abs(beam_pose[0]) * x_factor, beam_pose[1], 0.6745)
+        theta = beam_pose[2] + theta_shift
+        quat = quat_from_axis_angle((0, 0, 1), theta)
 
-        pos = (pose[0], pose[1], 0.6745)
-        mujoco_quat = quat_from_axis_angle((0, 0, 1), pose[2])
+        logger.debug('Beam team #%d player #%02d to (%.3f, %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], degrees(theta))
 
-        place_robot_3d(agent_id.prefix, self._mj_model, self._mj_data, pos, mujoco_quat)
+        player.place_at(pos, quat)
+        player.init_joints()
 
     def request_kick_off(self, team_side: TeamSide | int) -> None:
         """Instruct kickoff for the given team.

@@ -115,3 +115,15 @@ class SoccerPlayer(SimAgent):
 
         self.place_quat: tuple[float, float, float, float] | None = None
         """The target rotation quaternion to place the player (if a player placement is requested)."""
+
+    def relocate(self) -> None:
+        """Place the object at the buffered relocation position (if existing)."""
+
+        if self.place_pos is not None:
+            quat = (1.0, 0.0, 0.0, 0.0) if self.place_quat is None else self.place_quat
+
+            self.place_at(self.place_pos, quat)
+            self.init_joints()
+
+            self.place_pos = None
+            self.place_quat = None
