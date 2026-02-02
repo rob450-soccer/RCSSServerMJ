@@ -30,6 +30,9 @@ class SoccerFieldVersions(Enum):
     HL_ADULT_2020 = 'hl_adult_2020'
     """2020 version of the RoboCup Humanoid Adult Size League soccer field."""
 
+    SIM3D_7VS7 = 'sim3d_7vs7'
+    """3D simulation version of the 7 vs 7 soccer field."""
+
     @staticmethod
     def from_value(version: str) -> SoccerFieldVersions:
         """Fetch the enum entry corresponding to the given version value."""
@@ -54,6 +57,8 @@ def create_soccer_field(version: str) -> SoccerField:
         return HLAdult2019SoccerField()
     if version_id in (SoccerFieldVersions.HL_ADULT_2020, SoccerFieldVersions.HL_ADULT):
         return HLAdult2020SoccerField()
+    if version_id == SoccerFieldVersions.SIM3D_7VS7:
+        return Sim3D7vs7SoccerField()
 
     # cases: FIFA and UNKNOWN
     return FIFASoccerField()
@@ -247,4 +252,25 @@ class HLAdult2020SoccerField(SoccerField):
             corner_area_radius=0,  # none specified
             penalty_spot_distance=2.1,
             center_circle_radius=1.5,
+        )
+
+
+@dataclass
+class Sim3D7vs7SoccerField(SoccerField):
+    """Official FIFA soccer field specification for 7 vs 7 games."""
+
+    def __init__(self) -> None:
+        """Construct a new FIFA soccer field."""
+
+        super().__init__(
+            field_dim=(55, 36, 40),  # official  7vs7 measures - z height is arbitrary
+            line_width=0.1,  # officially max width of 12cm, but at least the goal line has to match the diameter of the goal posts
+            field_border=3.0,
+            goal_dim=(1, 3.66, 1.83),  # could not find official specification of depth (x dimensions)
+            goal_post_radius=0.05,  # officially max diameter of 12cm, but has to be the same as the goal line width
+            goalie_area_dim=(4, 7.3),  # adjusted from official penalty area size
+            penalty_area_dim=(9, 16.5),  # official size
+            corner_area_radius=1,  # not sure if used
+            penalty_spot_distance=7.32,  # official penalty spot
+            center_circle_radius=5.5,  # official radius
         )
