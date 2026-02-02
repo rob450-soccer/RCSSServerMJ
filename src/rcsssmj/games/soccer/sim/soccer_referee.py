@@ -1,12 +1,9 @@
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from rcsssmj.games.soccer.play_mode import PlayMode
 from rcsssmj.games.soccer.sim.soccer_game import PSoccerGame
 from rcsssmj.games.teams import TeamSide
-
-if TYPE_CHECKING:
-    from rcsssmj.sim.agent_id import AgentID
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +24,6 @@ class SoccerReferee:
         self.game: PSoccerGame = cast(PSoccerGame, game)
         """The soccer game instance to referee."""
 
-        self._agent_na_touch_ball: AgentID | None = None
-        """The agent not allowed to touch the ball a second time (if existing)."""
-
-        self._team_na_score: TeamSide | None = None
-        """The team side, which is not allowed to score a goal until another agent touches the ball again (if existing)."""
-
         self._did_act: bool = False
         """Flag if the referee has already taken a decision in this referee cycle."""
 
@@ -40,21 +31,19 @@ class SoccerReferee:
         """Reinitialize the referee."""
 
         # init referee state
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
         self._did_act = False
 
     def is_beaming_allowed(self) -> bool:
         """Check if an agent is allowed to beam in the current game state."""
 
-        return self.game.game_state.get_play_mode() in (PlayMode.BEFORE_KICK_OFF, PlayMode.GOAL_LEFT, PlayMode.GOAL_RIGHT)
+        return self.game.game_state.play_mode in (PlayMode.BEFORE_KICK_OFF, PlayMode.GOAL_LEFT, PlayMode.GOAL_RIGHT)
 
     def kick_off(self, team_side: TeamSide | int) -> None:
         """Instruct kickoff for the given team.
 
         Parameter
         ---------
-        team_side: TeamSide
+        team_side: TeamSide | int
             The team side for which to give the kick off.
         """
 
@@ -62,11 +51,13 @@ class SoccerReferee:
             team_side = TeamSide.from_id(team_side)
 
         self._did_act = True
+
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.KICK_OFF_LEFT, PlayMode.KICK_OFF_RIGHT)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = team_side
+
         self.game.ball.place_pos = (0, 0)
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = team_side
 
     def play_on(self) -> None:
         """Instruct the normal progressing of the game."""
@@ -84,12 +75,14 @@ class SoccerReferee:
         """
 
         self._did_act = True
+
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.THROW_IN_LEFT, PlayMode.THROW_IN_RIGHT)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = None
+
         y = self.game.field.field_area.min_y if self.game.ball.xpos[1] < 0 else self.game.field.field_area.max_y
         self.game.ball.place_pos = (self.game.ball.xpos[0], y)
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
 
     def corner_kick(self, team_side: TeamSide) -> None:
         """Instruct corner kick for the given team.
@@ -101,13 +94,15 @@ class SoccerReferee:
         """
 
         self._did_act = True
+
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.CORNER_KICK_LEFT, PlayMode.CORNER_KICK_RIGHT)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = None
+
         x = self.game.field.field_area.max_x if team_side == TeamSide.LEFT else self.game.field.field_area.min_x
         y = self.game.field.field_area.min_y if self.game.ball.xpos[1] < 0 else self.game.field.field_area.max_y
         self.game.ball.place_pos = (x, y)
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
 
     def goal_kick(self, team_side: TeamSide) -> None:
         """Instruct goal kick for the given team.
@@ -119,11 +114,13 @@ class SoccerReferee:
         """
 
         self._did_act = True
+
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.GOAL_KICK_LEFT, PlayMode.GOAL_KICK_RIGHT)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = None
+
         self.game.ball.place_pos = self.game.field.left_goalie_area.center() if team_side == TeamSide.LEFT else self.game.field.right_goalie_area.center()
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
 
     def offsite(self, team_side: TeamSide) -> None:
         """Offsite state for the given team.
@@ -141,10 +138,12 @@ class SoccerReferee:
         """Instruct the end of the game."""
 
         self._did_act = True
+
         self.game.game_state.set_play_mode(PlayMode.GAME_OVER)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = None
+
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
 
     def goal(self, team_side: TeamSide) -> None:
         """Count a goal for the given team and set the play mode accordingly.
@@ -156,9 +155,8 @@ class SoccerReferee:
         """
 
         self._did_act = True
+
         self.game.game_state.goal(team_side)
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
 
     def free_kick(self, team_side: TeamSide) -> None:
         """Instruct an indirect free kick for the given team.
@@ -170,11 +168,13 @@ class SoccerReferee:
         """
 
         self._did_act = True
+
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.FREE_KICK_LEFT, PlayMode.FREE_KICK_RIGHT)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = team_side
+
         self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1])
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = team_side
 
     def direct_free_kick(self, team_side: TeamSide) -> None:
         """Instruct a direct free kick for the given team.
@@ -186,11 +186,13 @@ class SoccerReferee:
         """
 
         self._did_act = True
+
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.DIRECT_FREE_KICK_LEFT, PlayMode.DIRECT_FREE_KICK_RIGHT)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = None
+
         self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1])
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
 
     def penalty_kick(self, team_side: TeamSide) -> None:
         """Instruct a penalty kick for the given team.
@@ -202,12 +204,14 @@ class SoccerReferee:
         """
 
         self._did_act = True
+
         self.game.game_state.set_play_mode_for_team(team_side, PlayMode.PENALTY_KICK_LEFT, PlayMode.PENALTY_KICK_RIGHT)
+        self.game.game_state.agent_na_touch_ball = None
+        self.game.game_state.team_na_score = None
+
         penalty_spot_x = self.game.field.field_area.max_x - self.game.field.penalty_spot_distance
         self.game.ball.place_pos = (-penalty_spot_x if team_side == TeamSide.LEFT else penalty_spot_x, 0)
         self.game.ball.reset_contacts()
-        self._agent_na_touch_ball = None
-        self._team_na_score = None
 
     def penalty_shoot(self, team_side: TeamSide) -> None:
         """Instruct a penalty shoot for the given team.
@@ -241,10 +245,10 @@ class SoccerReferee:
         """Referee the current game situation."""
 
         # update game state times
-        self.game.game_state.update(self.game.sim_time, progress_play_time=self.game.game_state.get_play_mode() not in (PlayMode.BEFORE_KICK_OFF, PlayMode.GAME_OVER))
+        self.game.game_state.update(self.game.sim_time, progress_play_time=self.game.game_state.play_mode not in (PlayMode.BEFORE_KICK_OFF, PlayMode.GAME_OVER))
 
         # check game over
-        if self.game.game_state.get_play_time() >= self.game.rules.half_time:
+        if self.game.game_state.play_time >= self.game.rules.half_time:
             self.game_over()
             return
 
@@ -265,17 +269,21 @@ class SoccerReferee:
     def _check_fouls(self) -> None:
         """Check fouls / violations of game rules."""
 
+        active_ball_contact = self.game.ball.active_contact
+        last_ball_contact = self.game.ball.last_contact
+        agent_na_touch_ball = self.game.game_state.agent_na_touch_ball
+
         # check no score rule
-        if self._team_na_score is not None and self.game.ball.active_contact is not None and self.game.ball.last_contact is not None:
-            self._team_na_score = None
+        if self.game.game_state.team_na_score is not None and active_ball_contact is not None and last_ball_contact is not None:
+            self.game.game_state.team_na_score = None
 
         # check double-touch rule
-        if self._agent_na_touch_ball is not None and self.game.ball.active_contact is not None and self.game.ball.last_contact is not None:
-            if self._agent_na_touch_ball == self.game.ball.last_contact and self._agent_na_touch_ball == self.game.ball.active_contact:
-                self.free_kick(TeamSide.get_opposing_side(self._agent_na_touch_ball.team_id))
+        if agent_na_touch_ball is not None and active_ball_contact is not None and last_ball_contact is not None:
+            if agent_na_touch_ball == last_ball_contact and agent_na_touch_ball == active_ball_contact:
+                self.free_kick(TeamSide.get_opposing_side(agent_na_touch_ball.team_id))
                 return
 
-            self._agent_na_touch_ball = None
+            self.game.game_state.agent_na_touch_ball = None
 
     def _check_timeouts(self) -> None:
         """Check timeouts (kick-off time, throw-in time, etc.) for the current play mode."""
@@ -284,7 +292,7 @@ class SoccerReferee:
             # the referee has already taken a decision in this simulation cycle
             return
 
-        pm = self.game.game_state.get_play_mode()
+        pm = self.game.game_state.play_mode
 
         if pm == PlayMode.PLAY_ON:
             # shortcut, as remaining rules only apply to other states than play-on
@@ -331,7 +339,7 @@ class SoccerReferee:
             # the referee has already taken a decision in this simulation cycle
             return
 
-        pm = self.game.game_state.get_play_mode()
+        pm = self.game.game_state.play_mode
 
         if pm in (PlayMode.GOAL_LEFT, PlayMode.GOAL_RIGHT):
             # no location triggers in goal states
@@ -342,7 +350,7 @@ class SoccerReferee:
             if pm == PlayMode.GOAL_KICK_LEFT:
                 # drop ball at a corner of the left goalie area
                 self.drop_ball((self.game.field.left_goalie_area.max_x, self.game.field.left_goalie_area.max_y))
-            elif self._team_na_score == TeamSide.RIGHT:
+            elif self.game.game_state.team_na_score == TeamSide.RIGHT:
                 self.goal_kick(TeamSide.LEFT)
             else:
                 self.goal(TeamSide.RIGHT)
@@ -353,7 +361,7 @@ class SoccerReferee:
             if pm == PlayMode.GOAL_KICK_RIGHT:
                 # drop ball at a corner of the left goalie area
                 self.drop_ball((self.game.field.right_goalie_area.min_x, self.game.field.right_goalie_area.max_y))
-            elif self._team_na_score == TeamSide.LEFT:
+            elif self.game.game_state.team_na_score == TeamSide.LEFT:
                 self.goal_kick(TeamSide.RIGHT)
             else:
                 self.goal(TeamSide.LEFT)
@@ -403,7 +411,7 @@ class SoccerReferee:
             # no action trigger
             return
 
-        pm = self.game.game_state.get_play_mode()
+        pm = self.game.game_state.play_mode
 
         if pm == PlayMode.PLAY_ON:
             # shortcut, as remaining rules only apply to other states than play-on
@@ -423,7 +431,7 @@ class SoccerReferee:
             PlayMode.DIRECT_FREE_KICK_RIGHT,
         ):
             if len(self.game.get_players(self.game.ball.active_contact.team_id)) > 1:
-                self._agent_na_touch_ball = self.game.ball.active_contact
+                self.game.game_state.agent_na_touch_ball = self.game.ball.active_contact
 
             self.play_on()
             return
@@ -440,7 +448,7 @@ class SoccerReferee:
             The mujoco simulation data array.
         """
 
-        pm = self.game.game_state.get_play_mode()
+        pm = self.game.game_state.play_mode
 
         if pm == PlayMode.KICK_OFF_LEFT:
             # TODO: relocate all players of the left team that are on the right side and all players of the right team that are on the left side or within the middle circle
@@ -492,23 +500,23 @@ class KickChallengeReferee(SoccerReferee):
     def referee(self) -> None:
         # check if an agent is connected
         if self._start_time < 0 and len(self.game.get_players(TeamSide.LEFT)) > 0:
-            self._start_time = self.game.game_state.get_sim_time() + 2
+            self._start_time = self.game.game_state.sim_time + 2
 
         # automatically kick-off left 2 seconds after the first agent connected
-        if self.game.game_state.get_play_mode() == PlayMode.BEFORE_KICK_OFF and self._start_time >= 0 and self._start_time <= self.game.game_state.get_sim_time():
+        if self.game.game_state.play_mode == PlayMode.BEFORE_KICK_OFF and self._start_time >= 0 and self._start_time <= self.game.game_state.sim_time:
             self.kick_off(TeamSide.LEFT)
 
         # forward to base class
         super().referee()
 
         # calculate challenge score
-        if self.game.game_state.get_play_mode() != PlayMode.GAME_OVER:
+        if self.game.game_state.play_mode != PlayMode.GAME_OVER:
             score = int((self.game.ball.xpos[0] - abs(self.game.ball.xpos[1])) * 100)
             self.game.game_state.set_score(TeamSide.LEFT, score)
 
     def _check_fouls(self) -> None:
         # disable no score rule
-        self._team_na_score = None
+        self.game.game_state.team_na_score = None
 
         # check double-touch rule
         if self.game.ball.active_contact is not None and self.game.ball.active_contact == self.game.ball.last_contact:

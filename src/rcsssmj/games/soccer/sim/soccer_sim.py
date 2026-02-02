@@ -467,8 +467,8 @@ class SoccerSimulation(BaseSimulation):
 
     def _generate_game_state_perception(self) -> Perception:
         return GameStatePerception(
-            play_time=self.game_state.get_play_time(),
-            play_mode=self.game_state.get_play_mode().value,
+            play_time=self.game_state.play_time,
+            play_mode=self.game_state.play_mode.value,
             team_left=self.game_state.get_team_name(TeamSide.LEFT),
             team_right=self.game_state.get_team_name(TeamSide.RIGHT),
             score_left=self.game_state.get_team_score(TeamSide.LEFT),
@@ -485,8 +485,8 @@ class SoccerSimulation(BaseSimulation):
                 right_team=self.game_state.get_team_name(TeamSide.RIGHT) or '<RIGHT>',
                 left_score=self.game_state.get_team_score(TeamSide.LEFT),
                 right_score=self.game_state.get_team_score(TeamSide.RIGHT),
-                play_time=self.game_state.get_play_time(),
-                play_mode=self.game_state.get_play_mode().value,
+                play_time=self.game_state.play_time,
+                play_mode=self.game_state.play_mode.value,
             ),
         )
 

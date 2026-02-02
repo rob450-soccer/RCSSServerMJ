@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
+
 from rcsssmj.games.soccer.play_mode import PlayMode
 from rcsssmj.games.teams import TeamSide
+
+if TYPE_CHECKING:
+    from rcsssmj.sim.agent_id import AgentID
 
 
 class GameState:
@@ -9,46 +14,85 @@ class GameState:
         """Construct a new game state."""
 
         self._sim_time: float = 0.0
+        """The current simulation time in seconds."""
+
         self._play_time_ms: int = 0
+        """The current play time in milliseconds (to circumvent accumulation errors)."""
+
+        self._play_time: float = 0.0
+        """The current play time in seconds."""
+
         self._play_mode: PlayMode = PlayMode.BEFORE_KICK_OFF
-
-        self._left_team_name: str | None = None
-        self._right_team_name: str | None = None
-
-        self._left_team_score: int = 0
-        self._right_team_score: int = 0
+        """The current play mode."""
 
         self._play_mode_history_ms: dict[PlayMode, float] = {pm: 0 for pm in PlayMode}
+        """The play mode time history."""
+
+        self._left_team_name: str | None = None
+        """The name of the left team or ``None`` in case no team connected, yet."""
+
+        self._right_team_name: str | None = None
+        """The name of the right team or ``None`` in case no second team connected, yet."""
+
+        self.left_team_score: int = 0
+        """The current score of the left team."""
+
+        self.right_team_score: int = 0
+        """The current score of the right team."""
+
+        self.agent_na_touch_ball: AgentID | None = None
+        """The ID of the agent not allowed to touch the ball a second time (if existing)."""
+
+        self.team_na_score: TeamSide | None = None
+        """The team side, which is not allowed to score a goal until another agent touches the ball again (if existing)."""
 
     def reset(self) -> None:
         """Reinitialize game state."""
 
         self._sim_time = 0.0
         self._play_time_ms = 0
+        self._play_time = 0.0
         self._play_mode = PlayMode.BEFORE_KICK_OFF
+        self._play_mode_history_ms = {pm: 0 for pm in PlayMode}
 
         self._left_team_name = None
         self._right_team_name = None
 
-        self._left_team_score = 0
-        self._right_team_score = 0
+        self.left_team_score = 0
+        self.right_team_score = 0
 
-        self._play_mode_history_ms = {pm: 0 for pm in PlayMode}
+        self.agent_na_touch_ball = None
+        self.team_na_score = None
 
-    def get_sim_time(self) -> float:
-        """Return the current simulation time."""
+    @property
+    def sim_time(self) -> float:
+        """The current simulation time."""
 
         return self._sim_time
 
-    def get_play_time(self) -> float:
-        """Return the current play time."""
+    @property
+    def play_time(self) -> float:
+        """The current play time."""
 
-        return self._play_time_ms / 1000.0
+        return self._play_time
 
-    def get_play_mode(self) -> PlayMode:
-        """Return the current play mode."""
+    @property
+    def play_mode(self) -> PlayMode:
+        """The current play mode."""
 
         return self._play_mode
+
+    @property
+    def left_team_name(self) -> str | None:
+        """The name of the left team or ``None`` in case no team connected, yet."""
+
+        return self._left_team_name
+
+    @property
+    def right_team_name(self) -> str | None:
+        """The name of the right team or ``None`` in case no second team connected, yet."""
+
+        return self._right_team_name
 
     def get_team_name(self, side: TeamSide) -> str | None:
         """Return the team name for the given team side."""
@@ -64,7 +108,7 @@ class GameState:
         if side == TeamSide.UNKNOWN:
             return 0
 
-        return self._left_team_score if side == TeamSide.LEFT else self._right_team_score
+        return self.left_team_score if side == TeamSide.LEFT else self.right_team_score
 
     def get_play_mode_time(self, play_mode: PlayMode | None = None) -> float:
         """Return the play time given play mode has last been activated.
@@ -156,10 +200,10 @@ class GameState:
         """
 
         if team_side == TeamSide.LEFT:
-            self._left_team_score = score
+            self.left_team_score = score
 
         elif team_side == TeamSide.RIGHT:
-            self._right_team_score = score
+            self.right_team_score = score
 
     def update(self, sim_time: float, *, progress_play_time: bool = True) -> None:
         """Update the game state with the given simulation time.
@@ -189,9 +233,12 @@ class GameState:
         """
 
         if team_side == TeamSide.LEFT:
-            self._left_team_score += 1
+            self.left_team_score += 1
             self.set_play_mode(PlayMode.GOAL_LEFT)
 
         elif team_side == TeamSide.RIGHT:
-            self._right_team_score += 1
+            self.right_team_score += 1
             self.set_play_mode(PlayMode.GOAL_RIGHT)
+
+        self.agent_na_touch_ball = None
+        self.team_na_score = None
