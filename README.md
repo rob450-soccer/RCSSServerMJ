@@ -2,6 +2,8 @@
 
 The RoboCup Soccer Simulation Server based on the MuJoCo physics engine.
 
+*This repository is a fork of the original repository, which can be found [here](https://gitlab.com/robocup-sim/rcssservermj)*
+
 ![Soccer Simulation Screenshot](https://gitlab.com/robocup-sim/rcssservermj/-/raw/master/doc/source/_static/img/screenshot-T1.png)
 
 __Video__: [https://youtu.be/iYWw7vATQU4](https://youtu.be/iYWw7vATQU4)
