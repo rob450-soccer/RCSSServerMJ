@@ -144,6 +144,10 @@ class SimServer:
         self._shutdown: bool = True
         """Flag indicating a shutdown request, causing the simulation server to shutdown."""
 
+        # changed: add wall-clock start time for speed computation
+        self._start_wall_time: float | None = None
+        """Wall-clock time when the server started (used for average FPS computation)."""
+
     def run(self) -> None:
         """Run simulation server."""
 
@@ -185,7 +189,26 @@ class SimServer:
         logger.info('Starting server... DONE!')
 
         # 2. RUN: Wait until simulation thread finished
-        sim_thread.join()  # run simulation loop in separate thread to isolate exceptions and allow the main thread to clean up
+        # changed: record wall-clock start time for FPS computation
+        self._start_wall_time = time.time()
+
+        try:
+            sim_thread.join()  # run simulation loop in separate thread to isolate exceptions and allow the main thread to clean up
+        except KeyboardInterrupt:
+            logger.info('KeyboardInterrupt received, shutting down...')
+            # signal simulation thread to stop and wait for it to finish
+            self._shutdown = True
+            sim_thread.join()
+
+        # compute and log average FPS (simulation time / wall time)
+        if self._start_wall_time is not None:
+            try:
+                sim_time = float(self.sim.sim_time)
+            except Exception:
+                sim_time = 0.0
+            wall_elapsed = max(0.0, time.time() - self._start_wall_time)
+            fps = sim_time / wall_elapsed if wall_elapsed > 0 else 0.0
+            logger.info('Average FPS: sim_time=%.3f wall_elapsed=%.3f fps=%.3f', sim_time, wall_elapsed, fps)
 
         # 3. CLEANUP: Shutdown everything and wait for socket threads to finish
         logger.info('Shutting down Server...')
@@ -363,6 +386,9 @@ class SimServer:
             # progress simulation
             self.sim.step(agent_actions, monitor_commands)
 
+            # changed: log simulation and wall-clock time for monitoring/debugging
+            logger.info('sim_time=%.3f wall_time=%.3f', self.sim.sim_time, time.time())
+
             # update connected monitors
             self._update_monitors(active_monitors)
 
@@ -407,6 +433,9 @@ class SimServer:
 
             # progress simulation
             self.sim.step(agent_actions, monitor_commands)
+
+            # changed: log simulation and wall-clock time for monitoring/debugging
+            logger.info('sim_time=%.3f wall_time=%.3f', self.sim.sim_time, time.time())
 
             # handle ready agents
             activated_agents, deactivated_agents = self._activate_agents(ready_agents)
