@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Final
+from typing import Final, Generic, TypeVar
 
 from rcsssmj.sim.sim_interfaces import PSimActionInterface
 
@@ -40,7 +40,10 @@ class InitRequest:
         """The requested player number."""
 
 
-class SimAction(ABC):
+SAI = TypeVar('SAI', bound=PSimActionInterface)
+
+
+class SimAction(ABC, Generic[SAI]):
     """Base class for simulation actions."""
 
     def __init__(self, actuator_name: str) -> None:
@@ -58,17 +61,17 @@ class SimAction(ABC):
         """The name of the actuator."""
 
     @abstractmethod
-    def perform(self, ai: PSimActionInterface) -> None:
+    def perform(self, ai: SAI) -> None:
         """Perform this action.
 
         Parameter
         ---------
-        ai: PSimActionInterface
+        ai: SAI
             The simulation action interface.
         """
 
 
-class MotorAction(SimAction):
+class MotorAction(SimAction[PSimActionInterface]):
     """Class for representing a motor action."""
 
     def __init__(self, actuator_name: str, q: float, dq: float, kp: float, kd: float, tau: float):
@@ -114,3 +117,38 @@ class MotorAction(SimAction):
 
     def perform(self, ai: PSimActionInterface) -> None:
         ai.ctrl_motor(self.actuator_name, self.q, self.dq, self.kp, self.kd, self.tau)
+
+
+class SpeakerAction(SimAction[PSimActionInterface]):
+    """Class for representing a speaker action."""
+
+    def __init__(
+        self,
+        actuator_name: str,
+        volume: float,
+        message: bytes | bytearray,
+    ):
+        """Construct a new speaker action.
+
+        Parameter
+        ---------
+        actuator_name: str
+            The name of the speaker effector.
+
+        volume: float
+            The speaker volume gain parameter.
+
+        message: bytes | bytearray
+            The message to broadcast.
+        """
+
+        super().__init__(actuator_name)
+
+        self.volume: Final[float] = volume
+        """The speaker gain parameter."""
+
+        self.message: Final[bytes | bytearray] = message
+        """The message to broadcast."""
+
+    def perform(self, ai: PSimActionInterface) -> None:
+        ai.say_message(self.actuator_name, self.volume, self.message)

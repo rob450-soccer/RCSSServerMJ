@@ -1,15 +1,18 @@
 import logging
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum
-from queue import Queue
-from threading import Thread
-from typing import cast
+from queue import Empty, Queue
+from threading import Thread, current_thread
+from typing import Generic, TypeVar, cast
 
 from rcsssmj.server.action_parser import ActionParser
 from rcsssmj.server.communication.connection import PConnection
 from rcsssmj.server.perception_encoder import PerceptionEncoder
 from rcsssmj.sim.actions import SimAction
-from rcsssmj.sim.sim_agent import SimAgent
+from rcsssmj.sim.sim_agent import SimAgent, TypedSimAgent
+from rcsssmj.sim.sim_interfaces import PSimActionInterface
+from rcsssmj.sim.simulation import BaseSimulation
 
 logger = logging.getLogger(__name__)
 
@@ -30,19 +33,19 @@ class RemoteAgentState(Enum):
     """The agent has been shut down and is waiting to be removed from the simulation server."""
 
 
-class RemoteAgent:
+S = TypeVar('S', bound=BaseSimulation)
+
+
+class RemoteAgent(Generic[S], ABC):
     """Remote simulation agent, utilizing a message based connection to communicate with an external agent process."""
 
-    def __init__(self, conn: PConnection, parser: ActionParser, encoder: PerceptionEncoder) -> None:
+    def __init__(self, conn: PConnection, encoder: PerceptionEncoder) -> None:
         """Construct a new remote simulation agent.
 
         Parameter
         ---------
         conn: PConnection
             The agent connection.
-
-        parser: ActionParser
-            The action message parser instance.
 
         encoder: PerceptionEncoder
             The perception message encoder instance.
@@ -54,32 +57,14 @@ class RemoteAgent:
         self._model_name: str = ''
         """The name of the robot model used for this agent."""
 
-        self._team_name: str = ''
-        """The name of the team the agent belongs to."""
-
-        self._player_no: int = -1
-        """The player number."""
-
-        self._sim_agent: SimAgent | None = None
-        """The simulation agent instance associated with this remote agent."""
-
-        self._action_queue: Queue[Sequence[SimAction]] = Queue()
-        """The queue to which incoming agent actions are forwarded."""
-
         self._conn: PConnection = conn
         """The agent connection for exchanging perception and action messages."""
-
-        self._parser: ActionParser = parser
-        """Parser for parsing incoming action messages."""
 
         self._encoder: PerceptionEncoder = encoder
         """Encoder for encoding outgoing perception messages."""
 
-        self._receive_thread: Thread = Thread(target=self._receive_loop)
-        """The receive thread, running the receive loop."""
-
-        # start receive loop
-        self._receive_thread.start()
+        self._agent_thread: Thread | None = None
+        """The thread, running the agent receive loop (if existing)."""
 
     @property
     def state(self) -> RemoteAgentState:
@@ -94,68 +79,64 @@ class RemoteAgent:
         return self._model_name
 
     @property
-    def team_name(self) -> str:
-        """The name of the team this agent belongs to."""
-
-        return self._team_name
-
-    @property
-    def player_no(self) -> int:
-        """The player number of this agent."""
-
-        return self._player_no
-
-    @property
+    @abstractmethod
     def sim_agent(self) -> SimAgent | None:
         """The simulation agent instance associated with this remote agent (if existing)."""
 
-        return self._sim_agent
-
-    @property
-    def action_queue(self) -> Queue[Sequence[SimAction]]:
-        """The action queue associated with this remote agent."""
-
-        return self._action_queue
-
-    def activate(self, agent: SimAgent) -> None:
-        """Activate the agent.
-
-        This method is called by the main simulation loop.
-        """
+    def activate(self, sim: S) -> None:
+        """Activate the remote agent."""
 
         if self._state == RemoteAgentState.READY:
-            self._sim_agent = agent
+            # try activating the agent
+            self._activate(sim)
 
-            self._state = RemoteAgentState.ACTIVE
+            if self.sim_agent is not None:
+                # simulation agent successfully created
+                logger.info('Agent %s activated.', self)
+                self._state = RemoteAgentState.ACTIVE
+            else:
+                # TODO: maybe switch to an ERROR state?
+                # failed to create simulation agent --> shutdown and remove agent
+                logger.info('Failed to activate agent %s. Shutting agent down again.', self)
+                self.shutdown()
 
-    def shutdown(self, *, wait: bool = False) -> None:
-        """Stop the agent.
+    @abstractmethod
+    def _activate(self, sim: S) -> None:
+        """Activate the remote agent."""
 
-        Parameter
-        ---------
-        wait: bool, default=False
-            True, if the calling thread should be blocked until the agent has finished its shutdown process, false if not.
-        """
+    @abstractmethod
+    def deactivate(self, sim: S) -> None:
+        """Deactivate remote agent instance."""
+
+    def shutdown(self) -> None:
+        """Stop the agent."""
 
         self._conn.shutdown()
 
-        if wait:
-            self._receive_thread.join()
+    def join(self) -> None:
+        """Wait until the agent listener thread terminates (if existing)."""
+
+        if self._agent_thread is not None:
+            self._agent_thread.join()
+
+    @abstractmethod
+    def collect_actions(self, *, block: bool = False, timeout: float = 5) -> None:
+        """Collect actions for the current cycle."""
 
     def send_perceptions(self) -> None:
         if not self._conn.is_active():
             # skip sending perception as the agent connection is already closed
             return
 
-        if self._sim_agent is None:
+        if self.sim_agent is None:
             # remote agent not registered to a simulation, yet
             return
 
         # encode perceptions message
-        msg = self._encoder.encode(self._sim_agent.perceptions)
+        msg = self._encoder.encode(self.sim_agent.perceptions)
         if msg is None:
             # encoding failed or resulted in an empty message
-            logger.warning('Perception message encoding for %s %d failed!', self._team_name, self._player_no)
+            logger.warning('Perception message encoding for %s failed!', self)
             msg = b'(error)'
         elif not msg:
             # no perceptions encoded
@@ -165,8 +146,19 @@ class RemoteAgent:
 
         self._conn.send_message(msg)
 
-    def _receive_loop(self) -> None:
-        """The internal receive loop for continuously receiving agent actions."""
+    def run(self) -> None:
+        """Continuously receive and process agent actions.
+
+        Note: This method is blocking until the agent connection has been closed and thus supposed to be executed in a separate thread.
+        """
+
+        if self._agent_thread is not None:
+            logger.warning('run()-method of remote agent %s called multiple times! Joining existing agent thread.', self)
+            self._agent_thread.join()
+            return
+
+        # fetch agent thread instance
+        self._agent_thread = current_thread()
 
         while True:
             # receive next action message
@@ -178,27 +170,19 @@ class RemoteAgent:
 
             if self._state == RemoteAgentState.INIT:
                 # agent is in INIT state -> process initialization message
-                init_action = self._parser.parse_init(msg)
-
-                if init_action is None:
+                if self._parse_init(msg):
+                    # initialization successful --> signal ready state
+                    self._state = RemoteAgentState.READY
+                else:
+                    # initialization failed --> shutdown agent again
                     logger.warning('Initialization for agent %s failed! Disconnecting!', self._conn)
                     self._conn.shutdown()
+                    # TODO: Switch to an ERROR state...
                     break
-
-                # set agent information
-                self._model_name = init_action.model_name
-                self._team_name = init_action.team_name
-                self._player_no = init_action.player_no
-
-                # signal ready state
-                self._state = RemoteAgentState.READY
 
             elif self._state == RemoteAgentState.ACTIVE:
                 # agent is in ACTIVE state -> process action message
-                actions = self._parser.parse_action(msg, cast(SimAgent, self._sim_agent).agent_id.prefix)
-
-                # forward action
-                self._action_queue.put(actions)
+                self._parse_action(msg)
 
             else:
                 # agent is in READY or SHUTDOWN state -> we don't expect any messages from the agent in these states
@@ -208,13 +192,91 @@ class RemoteAgent:
         self._conn.close()
 
         # add a dummy action to prevent possible timeout in sync-mode (one should be enough, but two don't hurt either)
-        self._action_queue.put([])
-        self._action_queue.put([])
+        if self.sim_agent is not None:
+            self._parse_action(b'(syn)')
+            self._parse_action(b'(syn)')
 
         logger.debug('Agent thread for %s finished!', self._conn)
 
+    @abstractmethod
+    def _parse_init(self, msg: bytes | bytearray) -> bool:
+        """Parse initialization message."""
+
+    @abstractmethod
+    def _parse_action(self, msg: bytes | bytearray) -> None:
+        """Parse action message."""
+
     def __str__(self) -> str:
-        return f'{self._team_name} #{self._player_no} @ {self._conn}'
+        return f'RemoteAgent @ {self._conn}'
 
     def __repr__(self) -> str:
         return f'RemoteAgent({self._conn.__repr__()})'
+
+
+SAI = TypeVar('SAI', bound=PSimActionInterface)
+
+
+class TypedRemoteAgent(RemoteAgent[S], Generic[S, SAI], ABC):
+    """Remote simulation agent with generic action type."""
+
+    def __init__(self, conn: PConnection, parser: ActionParser[SAI], encoder: PerceptionEncoder) -> None:
+        """Construct a new remote simulation agent.
+
+        Parameter
+        ---------
+        conn: PConnection
+            The agent connection.
+
+        parser: ActionParser
+            The action message parser instance.
+
+        encoder: PerceptionEncoder
+            The perception message encoder instance.
+        """
+
+        super().__init__(conn, encoder)
+
+        self._action_queue: Queue[Sequence[SimAction[PSimActionInterface] | SimAction[SAI]]] = Queue()
+        """The queue to which incoming agent actions are forwarded."""
+
+        self._parser: ActionParser[SAI] = parser
+        """Parser for parsing incoming action messages."""
+
+    @property
+    @abstractmethod
+    def sim_agent(self) -> TypedSimAgent[SAI] | None:
+        """The simulation agent instance associated with this remote agent or ``None`` in case the remote agent is not actively participating in the simulation, yet / any longer."""
+
+    @property
+    def action_queue(self) -> Queue[Sequence[SimAction[PSimActionInterface] | SimAction[SAI]]]:
+        """The action queue associated with this remote agent."""
+
+        return self._action_queue
+
+    def collect_actions(self, *, block: bool = False, timeout: float = 5) -> None:
+        """Collect actions for the current cycle."""
+
+        if self.sim_agent is None:
+            return
+
+        try:
+            if block:
+                # wait for exactly one agent action
+                self.sim_agent.set_actions(self._action_queue.get(timeout=timeout))
+            else:
+                # fetch all currently available actions
+                actions: list[SimAction[PSimActionInterface] | SimAction[SAI]] = []
+                while self._action_queue.qsize() > 0:
+                    actions += self._action_queue.get_nowait()
+                self.sim_agent.set_actions(actions)
+        except Empty:
+            if block:
+                # agent took too long to answer -> kill it
+                # logger.info('Team %s: Agent %d did not respond for more than %.3f seconds. Forcing agent shutdown.', self.team_name, self.player_no, timeout)
+                self.shutdown()
+
+    def _parse_action(self, msg: bytes | bytearray) -> None:
+        actions = self._parser.parse_action(msg, cast(TypedSimAgent, self.sim_agent).agent_id.prefix)
+
+        # forward action
+        self._action_queue.put(actions)

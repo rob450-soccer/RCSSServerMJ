@@ -5,7 +5,7 @@ requires = [
   "hatchling",
   # requirements.txt
   "numpy",
-  "mujoco==3.4.0"
+  "mujoco==3.5.0"
 ]
 build-backend = "hatchling.build"
 
@@ -45,7 +45,7 @@ requires-python = ">= 3.10"
 dependencies = [
   # When changing this, also update build-system.requires and requirements.txt
   "numpy",
-  "mujoco==3.4.0"
+  "mujoco==3.5.0"
 ]
 dynamic = ["version"]
 
@@ -53,6 +53,10 @@ dynamic = ["version"]
 ogl = [
   "PyOpenGL",
 ]
+ws = [
+  "websockets",
+]
+all = ["rcsssmj[ogl,ws]"]
 
 [project.urls]
 Homepage = "https://gitlab.com/robocup-sim/rcssservermj"
@@ -106,15 +110,17 @@ exclude = [
   "/tests"        # TODO: include tests once there are any
 ]
 
-[tool.hatch.envs.types]
+[tool.hatch.envs.dev]
+features = ["all"]
 extra-dependencies = [
   "mypy>=1.0.0"
 ]
 
-[tool.hatch.envs.types.scripts]
+[tool.hatch.envs.dev.scripts]
 check = "mypy --install-types --non-interactive {args:src/rcsssmj tests}"
 
 [tool.hatch.envs.doc]
+features = ["all"]
 extra-dependencies = [
   "sphinx",
   "pydata-sphinx-theme"
@@ -125,6 +131,7 @@ html = "sphinx-build -M html doc/source doc/build"
 clean = "sphinx-build -M clean doc/source doc/build"
 
 [tool.hatch.envs.test]
+features = ["all"]
 extra-dependencies = [
   "pytest"
 ]

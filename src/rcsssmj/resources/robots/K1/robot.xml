@@ -89,6 +89,8 @@
         <body name="Head_2" pos="0 0 0.033">
           <site name="head-vismarker" pos="0 0 0.08"/>
           <site name="camera" pos="0.06 0 0.08"/>
+          <site name="say_a-speaker" pos="0 0 0.05"/>
+          <site name="hear_a-micro" pos="0 0 0.09"/>
           <inertial pos="0.011042 -0.00092871 0.080698" quat="0.996402 -0.00118413 -0.0779414 -0.0332651" mass="0.7" diaginertia="0.00603249 0.00577511 0.0017024"/>
           <joint class="jXXS" name="Head_pitch" axis="0 1 0" range="-0.349 0.855"/>
           <geom class="visual" material="gray" mesh="Head_2"/>

@@ -1,21 +1,20 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import mujoco
 import numpy as np
 
 from rcsssmj.resources.spec_provider import ModelSpecProvider
-from rcsssmj.sim.actions import SimAction
-from rcsssmj.sim.agent_id import AgentID
-from rcsssmj.sim.agent_params import PAgentParameter
+from rcsssmj.sim.audio_engine import a_compile, a_forward, a_recompile, a_step
 from rcsssmj.sim.commands import MonitorCommand
 from rcsssmj.sim.perceptions import (
     AccelerometerPerception,
     AgentDetection,
     GyroPerception,
     JointStatePerception,
+    MicrophonePerception,
     ObjectDetection,
     OrientationPerception,
     Perception,
@@ -28,6 +27,9 @@ from rcsssmj.sim.perceptions import (
 from rcsssmj.sim.sim_agent import SimAgent
 from rcsssmj.sim.sim_object import SimObject
 from rcsssmj.sim.state_info import SceneGraph, SimStateInformation
+
+if TYPE_CHECKING:
+    from rcsssmj.sim.audio_data import AudioData
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +77,10 @@ class BaseSimulation(ABC):
         """The mujoco simulation model."""
 
         self._mj_data: Any = None
-        """The mujoco simulation data array."""
+        """The mujoco simulation data."""
+
+        self._a_data: AudioData = None  # type: ignore
+        """The audio engine data."""
 
         self._world_markers: Sequence[tuple[str, str]] = []
         """The sequence of world markers used for generating vision perceptions."""
@@ -100,7 +105,7 @@ class BaseSimulation(ABC):
 
     @property
     def mj_data(self) -> Any:
-        """The mujoco simulation data array."""
+        """The mujoco simulation data."""
 
         return self._mj_data
 
@@ -181,6 +186,32 @@ class BaseSimulation(ABC):
             actuator_vel_model.gainprm[0] = kd
             actuator_vel_model.biasprm[2] = -kd
 
+    def say_message(
+        self,
+        actuator_name: str,
+        volume: float,
+        message: bytes | bytearray,
+    ) -> None:
+        """Perform a say action.
+
+        Parameter
+        ---------
+        actuator_name: str
+            The name of the say actuator.
+
+        volume: float
+            The volume gain parameter.
+
+        message: bytes | bytearray
+            The message to say.
+        """
+
+        actuator = self._a_data.actuators.get(actuator_name, None)
+
+        if actuator is not None:
+            actuator.gainprm[0] = volume
+            actuator.ctrl = message
+
     def init(self) -> bool:
         """Initialize the game and create a new simulation world environment."""
 
@@ -196,6 +227,9 @@ class BaseSimulation(ABC):
 
         # calculate forward kinematics / dynamics of newly created world
         mujoco.mj_forward(self._mj_model, self._mj_data)
+
+        # prepare initial audio simulation data
+        self._a_data = a_compile(self._mj_spec)
 
         # extract visible object markers of world
         self._world_markers = [(site.name, site.name[:-10]) for site in self._mj_spec.sites if site.name.endswith('-vismarker')]
@@ -213,70 +247,15 @@ class BaseSimulation(ABC):
         self._mj_data = None
         self._world_markers = []
 
-    def add_agents(self, params: Sequence[PAgentParameter]) -> list[SimAgent | None]:
-        """Try adding agent representations for the given list of agent params.
-
-        Parameter
-        ---------
-        params: Sequence[PAgentParameter]
-            The list of parameter for which to add agents.
-        """
-
-        # add agents
-        sim_agents = [self._add_agent(p) for p in params]
-
-        if sim_agents:
-            # recompile spec in case new agents got added
-            self._recompile()
-
-        return sim_agents
-
-    def _add_agent(self, params: PAgentParameter) -> SimAgent | None:
-        """Try to add an agent with the given parameter.
-
-        Parameter
-        ---------
-        params: PAgentParameter
-            The agent parameter.
-        """
-
-        # try to load the robot model requested by the agent
-        robot_spec = self.spec_provider.load_robot(params.model_name)
-        if robot_spec is None:
-            # failed to load the requested model --> report failure
-            return None
-
-        # request participation in game
-        sim_agent = self._request_participation(params.team_name, params.player_no, robot_spec)
-        if sim_agent is None:
-            # invalid team side -> report failure
-            return None
+    def _attach_agent(self, agent: SimAgent) -> None:
+        """Attach an agent to the world."""
 
         # append robot to world
         frame = self._mj_spec.worldbody.add_frame()
-        frame.attach_body(robot_spec.body('torso'), sim_agent.agent_id.prefix, '')
+        frame.attach_body(agent.spec.body('torso'), agent.agent_id.prefix, '')
 
-        logger.info('Player %s #%d joined the game.', params.team_name, params.player_no)
-
-        return sim_agent
-
-    def remove_agents(self, agents: Sequence[SimAgent]) -> None:
-        """Remove the given list of agents.
-
-        Parameter
-        ---------
-        agents: Sequence[SimAgent]
-            The list of agent instances to remove.
-        """
-
-        if agents:
-            for agent in agents:
-                self._remove_agent(agent)
-
-            self._recompile()
-
-    def _remove_agent(self, agent: SimAgent) -> None:
-        """Remove the given agent instance.
+    def _detach_agent(self, agent: SimAgent) -> None:
+        """Detach the given agent instance.
 
         Parameter
         ---------
@@ -306,11 +285,6 @@ class BaseSimulation(ABC):
         del_els(agent.spec.texts)
         del_els(agent.spec.textures)
 
-        # remove agent from game
-        self._handle_withdrawal(agent.agent_id)
-
-        logger.info('Player %s left the game.', agent)
-
     def _recompile(self) -> None:
         """Recompile spec and bind sim objects."""
 
@@ -320,27 +294,33 @@ class BaseSimulation(ABC):
         # calculate forward kinematics / dynamics
         mujoco.mj_forward(self._mj_model, self._mj_data)
 
+        # recompile audio spec
+        self._a_data = a_recompile(self._mj_spec, self._a_data)
+
+        # calculate audio information
+        a_forward(self._a_data, self._mj_data)
+
         # rebind objects
         for obj in self.sim_objects:
             obj.bind(self._mj_model, self._mj_data)
 
-    def step(self, agent_actions: Sequence[SimAction], monitor_commands: Sequence[MonitorCommand]) -> None:
+    def step(self, monitor_commands: Sequence[MonitorCommand]) -> None:
         """Perform a simulation step.
 
         Parameter
         ---------
-        agent_actions: Sequence[SimAction]
-            The list of simulation agent actions.
-
         monitor_commands: Sequence[MonitorCommand]
             The list of monitor commands.
         """
 
         # pre-step hook
-        self._pre_step(agent_actions)
+        self._pre_step()
 
         # progress simulation
         mujoco.mj_step(self._mj_model, self._mj_data, self.n_substeps)
+
+        # progress audio simulation
+        a_step(self._a_data, self._mj_data)
 
         # post-step hook
         self._post_step(monitor_commands)
@@ -348,22 +328,12 @@ class BaseSimulation(ABC):
         # increment frame id
         self._frame_id += 1
 
-    def _pre_step(self, agent_actions: Sequence[SimAction]) -> None:
-        """Method executed right before a simulation step.
-
-        Parameter
-        ---------
-        agent_actions: Sequence[SimAction]
-            The list of simulation actions.
-        """
+    def _pre_step(self) -> None:
+        """Method executed right before a simulation step."""
 
         # notify simulation objects
         for obj in self.sim_objects:
             obj.pre_step(self._mj_model, self._mj_data)
-
-        # apply agent actions
-        for action in agent_actions:
-            action.perform(self)
 
     def _post_step(self, monitor_commands: Sequence[MonitorCommand]) -> None:
         """Method executed right after a simulation step.
@@ -467,7 +437,7 @@ class BaseSimulation(ABC):
                     px, py, pz = trunc3_vec(sensor.data[0:3])
                     agent_perceptions.append(PositionPerception(sensor_name, px, py, pz))
 
-                # TODO: Add perceptions for force and hear
+                # TODO: Add perceptions for force
 
                 else:
                     # sensor not supported...
@@ -476,6 +446,30 @@ class BaseSimulation(ABC):
             # joint state perception
             if joint_names:
                 agent_perceptions.append(JointStatePerception(joint_names, trunc2_vec(np.degrees(joint_axs)), trunc2_vec(np.degrees(joint_vxs))))
+
+            # audio perception
+            a_sensor = self._a_data.sensors.get(agent.agent_id.prefix + 'hear', None)
+            if a_sensor is not None:
+                n_msgs = len(a_sensor.messages)
+
+                # TODO: Introduce loss probability based on message volume and ambient volume.
+                # some distance based packet loss probability
+                # -  25 meter distance -->  4.1% packet loss
+                # -  40 meter distance --> 22.2% packet loss
+                # -  50 meter distance --> 50.0% packet loss
+                # -  60 meter distance --> 77.8% packet loss
+                # -  75 meter distance --> 95.9% packet loss
+                # - 100 meter distance --> 99.8% packet loss
+                packet_loss_rate_distance = 0.5 * np.tanh(np.pi * a_sensor.distances / 50.0 - np.pi) + 0.5
+
+                other_msg_mask = [not s.startswith(agent.agent_id.prefix) for s in a_sensor.sources]
+                loss_msg_mask = np.random.rand(n_msgs) > packet_loss_rate_distance
+                msg_indices = cast(Sequence[int], np.nonzero(other_msg_mask & loss_msg_mask)[0])  # cast to int sequence as mypy complains about not being able to use a numpy array element for indexing
+
+                # filter messages for perception
+                azimuths = cast(Sequence[int], np.trunc(np.degrees(np.atan2(a_sensor.origins[1, msg_indices], a_sensor.origins[0, msg_indices])), dtype=np.int64))  # cast to int sequence as mypy complains about type mismatch
+                filtered_messages = [a_sensor.messages[idx] for idx in msg_indices]
+                agent_perceptions.append(MicrophonePerception(a_sensor.name[prefix_length:], azimuths, filtered_messages))
 
             # ideal camera sensor-pipeline
             if gen_vision:
@@ -534,37 +528,6 @@ class BaseSimulation(ABC):
         -------
         MjSpec
             The game specific simulation world / environment specification.
-        """
-
-    @abstractmethod
-    def _request_participation(self, team_name: str, player_no: int, model_spec: Any) -> SimAgent | None:
-        """Validate and add a new agent requesting to join the game.
-
-        Parameter
-        ---------
-        team_name: str
-            The team name of the agent requesting participation.
-
-        player_no: int
-            The player number of the agent requesting participation.
-
-        model_spec: MjSpec
-            The robot model specification of the new agent.
-
-        Returns
-        -------
-        SimAgent | None
-            The simulation agent representation identifying the new agent if participation has been accepted, None if participation of the new agent has been rejected.
-        """
-
-    @abstractmethod
-    def _handle_withdrawal(self, agent_id: AgentID) -> None:
-        """Handle the withdrawal of an agent participating in the game.
-
-        Parameter
-        ---------
-        aid: AgentID
-            The id of the agent that withdrawed from the game.
         """
 
     @abstractmethod

@@ -1,14 +1,21 @@
+import base64
+import binascii
 import logging
 from abc import ABC, abstractmethod
 from math import radians
+from typing import Generic, TypeVar
 
-from rcsssmj.sim.actions import InitRequest, MotorAction, SimAction
+from rcsssmj.sim.actions import InitRequest, MotorAction, SimAction, SpeakerAction
+from rcsssmj.sim.sim_interfaces import PSimActionInterface
 from rcsssmj.utils.sexpression import SExpression
 
 logger = logging.getLogger(__name__)
 
 
-class ActionParser(ABC):
+SAI = TypeVar('SAI', bound=PSimActionInterface)
+
+
+class ActionParser(ABC, Generic[SAI]):
     """Base class for simulation agent action message parsers."""
 
     @abstractmethod
@@ -16,11 +23,11 @@ class ActionParser(ABC):
         """Parse a agent initialization message."""
 
     @abstractmethod
-    def parse_action(self, data: bytes | bytearray, model_prefix: str) -> list[SimAction]:
+    def parse_action(self, data: bytes | bytearray, model_prefix: str) -> list[SimAction[PSimActionInterface] | SimAction[SAI]]:
         """Parse a agent action message."""
 
 
-class DefaultActionParser(ActionParser):
+class DefaultActionParser(ActionParser[SAI]):
     """Default action message parser implementation based on symbolic expressions."""
 
     def parse_init(self, data: bytes | bytearray) -> InitRequest | None:
@@ -44,10 +51,10 @@ class DefaultActionParser(ActionParser):
 
         return InitRequest(model_name, team_name, player_no)
 
-    def parse_action(self, data: bytes | bytearray, model_prefix: str) -> list[SimAction]:
+    def parse_action(self, data: bytes | bytearray, model_prefix: str) -> list[SimAction[PSimActionInterface] | SimAction[SAI]]:
         """Try parsing an action message into individual simulation agent actions."""
 
-        actions: list[SimAction] = []
+        actions: list[SimAction[PSimActionInterface] | SimAction[SAI]] = []
 
         # parse individual actions from message
         try:
@@ -64,7 +71,7 @@ class DefaultActionParser(ActionParser):
 
         return actions
 
-    def parse_node(self, node: SExpression, model_prefix: str) -> SimAction | None:
+    def parse_node(self, node: SExpression, model_prefix: str) -> SimAction[PSimActionInterface] | SimAction[SAI] | None:
         """Try parsing an action message node into an simulation agent action."""
 
         n_elements = len(node)
@@ -72,6 +79,17 @@ class DefaultActionParser(ActionParser):
         if node[0] == b'syn':
             # sync action: (syn)
             return None
+
+        if node[0] == b'SPK' and n_elements > 3:
+            # say action: (SPK <name> <volume> <message>)
+            try:
+                return SpeakerAction(
+                    model_prefix + node.get_str(1),
+                    node.get_float(2) / 100,
+                    base64.b64decode(node.get_str(3), validate=True),
+                )
+            except binascii.Error:
+                return None
 
         if n_elements == 6:
             # joint action: (<name> <q> <dq> <kp> <kd> <tau>)

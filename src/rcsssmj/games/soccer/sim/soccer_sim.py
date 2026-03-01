@@ -17,9 +17,9 @@ from rcsssmj.games.soccer.soccer_fields import SoccerField
 from rcsssmj.games.soccer.soccer_rules import FIFASoccerRules, SoccerRules
 from rcsssmj.games.teams import TeamSide
 from rcsssmj.sim.agent_id import AgentID
+from rcsssmj.sim.agent_params import PAgentParameter
 from rcsssmj.sim.commands import MonitorCommand
 from rcsssmj.sim.perceptions import Perception
-from rcsssmj.sim.sim_agent import SimAgent
 from rcsssmj.sim.sim_object import SimObject
 from rcsssmj.sim.simulation import BaseSimulation
 from rcsssmj.sim.state_info import SimStateInformation
@@ -398,51 +398,120 @@ class SoccerSimulation(BaseSimulation):
 
         return world_spec
 
-    def _request_participation(self, team_name: str, player_no: int, model_spec: Any) -> SimAgent | None:
+    def add_players(self, params: Sequence[PAgentParameter]) -> list[SoccerAgent | None]:
+        """Try adding player representations for the given list of agent params.
+
+        Parameter
+        ---------
+        params: Sequence[PAgentParameter]
+            The list of parameter for which to add agents.
+        """
+
+        # add agents
+        sim_agents = [self._add_player(p) for p in params]
+
+        # recompile spec in case new agents got added
+        self._recompile()
+
+        return sim_agents
+
+    def _add_player(self, params: PAgentParameter) -> SoccerAgent | None:
+        """Try to add an players with the given parameter.
+
+        Parameter
+        ---------
+        params: PAgentParameter
+            The agent parameter.
+        """
+
+        # try to load the robot model requested by the agent
+        robot_spec = self.spec_provider.load_robot(params.model_name)
+        if robot_spec is None:
+            # failed to load the requested model --> report failure
+            return None
+
         # check player number
-        if player_no > self.rules.max_player_no:
+        if params.player_no > self.rules.max_player_no:
+            # player number is out of range --> report failure
             return None
 
         # update known team names
-        self.game_state.update_team_names(team_name)
+        self.game_state.update_team_names(params.team_name)
 
         # fetch team side for agent
-        team_id = self.game_state.get_team_side(team_name).value
+        team_id = self.game_state.get_team_side(params.team_name).value
 
         if not TeamSide.is_valid(team_id):
+            # player could not be assigned to a participating team --> report failure
             return None
 
         # check if a player with the same player number of the agent is already present in the game
-        if player_no in self._team_players[team_id]:
+        if params.player_no in self._team_players[team_id]:
+            # a player with the given player number already exists in the given team --> report failure
             return None
 
         # check if the new player would exceed the maximum number of allowed players per team
         if len(self._team_players[team_id]) >= self.rules.max_team_size:
+            # adding the player would violate the maximum number of allowed players for the given team --> report failure
             return None
 
-        agent_id = AgentID(team_id, player_no)
+        agent_id = AgentID(team_id, params.player_no)
 
         # append new player to team dict
-        player = SoccerAgent(agent_id, team_name, model_spec)
-        self._team_players[team_id][player_no] = player
+        player = SoccerAgent(agent_id, params.team_name, robot_spec, self)
+        self._team_players[team_id][params.player_no] = player
 
         # set team color and spawn position
-        model_spec.material('team').rgba = [0, 0, 1, 1] if team_id == TeamSide.LEFT.value else [1, 0, 0, 1]
+        robot_spec.material('team').rgba = [0, 0, 1, 1] if team_id == TeamSide.LEFT.value else [1, 0, 0, 1]
 
         x_sign = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
-        root_body = model_spec.body('torso')
+        root_body = robot_spec.body('torso')
         root_body.pos[0] = x_sign * (2 * agent_id.player_no + 1)
         root_body.pos[1] = (self.field.field_dim[1] / 2) + self.field.field_border
         root_body.quat[0:4] = quat_from_axis_angle((0, 0, 1), -pi / 2)
 
         logger.debug('Spawn team #%d player #%02d @ (%.3f %.3f)', agent_id.team_id, agent_id.player_no, root_body.pos[0], root_body.pos[1])
 
+        # append robot to simulation
+        self._attach_agent(player)
+
+        logger.info('Player %s #%d joined the game.', params.team_name, params.player_no)
+
         return player
 
-    def _handle_withdrawal(self, agent_id: AgentID) -> None:
-        if TeamSide.is_valid(agent_id.team_id):
+    def remove_players(self, players: Sequence[SoccerAgent]) -> None:
+        """Remove the given list of players.
+
+        Parameter
+        ---------
+        players: Sequence[SoccerAgent]
+            The list of player instances to remove.
+        """
+
+        if players:
+            for agent in players:
+                self._remove_player(agent)
+
+            self._recompile()
+
+    def _remove_player(self, player: SoccerAgent) -> None:
+        """Remove the given player instance.
+
+        Parameter
+        ---------
+        player: SoccerAgent
+            The player to remove.
+        """
+
+        # remove agent model from simulation
+        self._detach_agent(player)
+
+        # remove agent from game
+        if TeamSide.is_valid(player.agent_id.team_id):
             with contextlib.suppress(KeyError):
-                del self._team_players[agent_id.team_id][agent_id.player_no]
+                del self._team_players[player.agent_id.team_id][player.agent_id.player_no]
+
+        logger.info('Player %s left the game.', player)
 
     def _post_step(self, monitor_commands: Sequence[MonitorCommand]) -> None:
         # forward to parent

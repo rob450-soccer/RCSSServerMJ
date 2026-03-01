@@ -43,7 +43,8 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the time is truncated to three digits (milliseconds).
+    None.
+    However, the time is truncated to three digits (milliseconds).
 
 
 Message Format
@@ -88,7 +89,8 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the position coordinates are truncated to three digits (millimeter).
+    None.
+    However, the position coordinates are truncated to three digits (millimeter).
 
 
 Message Format
@@ -134,7 +136,8 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the quaternion coordinates are truncated to three digits.
+    None.
+    However, the quaternion coordinates are truncated to three digits.
 
 
 Message Format
@@ -178,7 +181,8 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the angular velocity values are truncated to two digits.
+    None.
+    However, the angular velocity values are truncated to two digits.
 
 
 Message Format
@@ -222,7 +226,8 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the linear acceleration values are truncated to two digits.
+    None.
+    However, the linear acceleration values are truncated to two digits.
 
 
 Message Format
@@ -266,7 +271,8 @@ Frequency
     Every cycle.
 
 Noise Model
-    None. However, the axis position and velocity values are truncated to two digits.
+    None.
+    However, the axis position and velocity values are truncated to two digits.
 
 
 Message Format
@@ -485,6 +491,55 @@ S-Expression:
                 (llowerarm (pol 0.18 34.29 -19.80))))
 
 
+.. _agent-protocol_microphone-perceptor:
+
+Microphone Perceptor
+^^^^^^^^^^^^^^^^^^^^
+
+The microphone perceptor for receiving messages sent by other agents.
+
+Even though this perceptor is called *microphone*, it doesn't receive low-level audio signals directly.
+Instead, it rather represents the output of an universal audio-processing pipeline based on a singular microphone or a microphone array.
+As such, it perceives detected messages, possibly accompanied with some direction information.
+
++-------------+-------+------+-------------------------------------------------------------------+
+| Perceptor   | Type  | Unit | Description                                                       |
+| Information |       |      |                                                                   |
++=============+=======+======+===================================================================+
+| **name**    | str   |      | The name of the microphone sensor.                                |
++-------------+-------+------+-------------------------------------------------------------------+
+| **azimuth** | int   | deg  | The azimuth / horizontal angle to the origin of the audio source. |
++-------------+-------+------+-------------------------------------------------------------------+
+| **message** | str   |      | The received Base64-encoded message.                              |
++-------------+-------+------+-------------------------------------------------------------------+
+| :py:class:`rcsssmj.sim.perceptions.MicrophonePerception`                                       |
++-------------+-------------+-----------+--------------------------------------------------------+
+
+For more information see :ref:`Speaker Effector <agent-protocol_speaker-effector>`.
+
+Frequency
+    Every Cycle.
+
+Noise Model
+    None.
+    TBD.
+
+
+Message Format
+""""""""""""""
+
+S-Expression:
+    .. code::
+
+        (MIC <name> +(<azimuth> <message>))
+
+    Example message:
+
+    .. code::
+
+        (MIC hear (16 AA==) (-2 Adp4gLR=))
+
+
 .. _agent-protocol_effectors:
 
 Effectors
@@ -631,19 +686,37 @@ S-Expression:
         (he1 12.42 0 0.9 0 0)
 
 
-.. _agent-protocol_say-effector:
+.. _agent-protocol_speaker-effector:
 
-Say Effector
-^^^^^^^^^^^^
+Speaker Effector
+^^^^^^^^^^^^^^^^
 
-Effector for exchanging text messages within the simulation in an audio-like fashion.
+Effector for broadcasting text messages within the simulation in an audio-like fashion.
 
-Agents have a certain say capacity, which they can use to broadcast text messages in the simulation.
-These text messages are then received by other agents within the audible range.
++-------------+-------+---------+------------------------------------------+
+| Effector    | Type  | Unit    | Description                              |
+| Information |       |         |                                          |
++=============+=======+=========+==========================================+
+| **name**    | str   |         | The unique name of the speaker actuator. |
++-------------+-------+---------+------------------------------------------+
+| **volume**  | int   | percent | The speaker volume gain parameter.       |
++-------------+-------+---------+------------------------------------------+
+| **message** | str   |         | The Base64-encoded message to broadcast. |
++-------------+-------+---------+------------------------------------------+
+| :py:class:`rcsssmj.sim.actions.SpeakerAction`                            |
++-------------+-------+---------+------------------------------------------+
 
-.. note::
+An agent is only able to broadcast one message per speaker and simulation cycle.
+Multiple speaker actions for the same speaker will override each other.
+The message is expected to be encoded using `Base64 encoding <https://en.wikipedia.org/wiki/Base64>`_ with padding.
+**Padding is not optional!**
 
-    Not implemented yet.
+A message is broadcasted within the simulation at the current speaker location with the specified volume.
+All connected agents posing a :ref:`microphone sensor <agent-protocol_microphone-perceptor>` can potentially receive the broadcasted message.
+The only exception is the sending agent, which will not receive its own message.
+
+Noise Model
+    None.
 
 
 Message Format
@@ -652,10 +725,10 @@ Message Format
 S-Expression:
     .. code::
 
-        (say <message>)
+        (SPK <name> <volume> <message>)
 
     Example message:
 
     .. code::
 
-        (say HelloWorld)
+        (SPK say 100 AA==)

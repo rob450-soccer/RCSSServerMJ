@@ -107,7 +107,7 @@ class TCPLPMConnection:
         self.sock.close()
 
     def __str__(self) -> str:
-        return str(self.addr)
+        return f'TCP{self.addr}'
 
     def __repr__(self) -> str:
-        return str(self.addr)
+        return f'TCPLPMConnection{self.addr}'

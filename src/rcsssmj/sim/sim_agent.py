@@ -1,12 +1,15 @@
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any, Final
+from typing import Any, Final, Generic, TypeVar
 
 import numpy as np
 from mujoco import mjtJoint
 from numpy.typing import NDArray
 
+from rcsssmj.sim.actions import SimAction
 from rcsssmj.sim.agent_id import AgentID
 from rcsssmj.sim.perceptions import Perception
+from rcsssmj.sim.sim_interfaces import PSimActionInterface
 from rcsssmj.sim.sim_object import SimObject
 
 
@@ -132,3 +135,59 @@ class SimAgent(SimObject):
 
     def __str__(self) -> str:
         return f'{self.team_name} #{self.agent_id.player_no}'
+
+
+SAI = TypeVar('SAI', bound=PSimActionInterface)
+
+
+class TypedSimAgent(SimAgent, Generic[SAI], ABC):
+    """Simulation agent with generic action type."""
+
+    def __init__(self, agent_id: AgentID, team_name: str, spec: Any) -> None:
+        """Construct a new simulation agent.
+
+        Parameter
+        ---------
+        agent_id: AgentID
+            The id of the agent.
+
+        team_name: str
+            The name of the team the agent belongs to.
+
+        spec: Any
+            The agent model specification.
+        """
+
+        super().__init__(agent_id, team_name, spec)
+
+        self._actions: Sequence[SimAction[PSimActionInterface] | SimAction[SAI]] = []
+        """The current actions of the agent."""
+
+    @property
+    def actions(self) -> Sequence[SimAction[PSimActionInterface] | SimAction[SAI]]:
+        """The current actions of this agent."""
+
+        return self._actions
+
+    def set_actions(self, actions: Sequence[SimAction[PSimActionInterface] | SimAction[SAI]]) -> None:
+        """Set the actions of the agent for this simulation cycle.
+
+        Parameter
+        ---------
+        actions: Sequence[SimAction[PSimActionInterface | SAI]]
+            The list of actions of the agent for this simulation cycle.
+        """
+
+        self._actions = actions
+
+    def pre_step(self, mj_model: Any, mj_data: Any) -> None:
+        super().pre_step(mj_model, mj_data)
+
+        # apply buffered actions
+        ai = self._get_action_interface()
+        for action in self._actions:
+            action.perform(ai)
+
+    @abstractmethod
+    def _get_action_interface(self) -> SAI:
+        """Retrieve the agent action interface."""

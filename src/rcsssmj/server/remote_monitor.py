@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum
 from queue import Queue
-from threading import Thread
+from threading import Thread, current_thread
 
 from rcsssmj.server.command_parser import CommandParser
 from rcsssmj.server.communication.connection import PConnection
@@ -27,6 +27,8 @@ class SimMonitor(ABC):
     """Base class for simulation monitors, monitoring and interacting with the simulation."""
 
     def __init__(self, update_interval: int = 1):
+        """Construct a new simulation monitor."""
+
         super().__init__()
 
         self._state: RemoteMonitorState = RemoteMonitorState.ACTIVE
@@ -50,16 +52,13 @@ class SimMonitor(ABC):
 
         return self._command_queue
 
-    def shutdown(self, *, wait: bool = False) -> None:
-        """Stop the monitor.
-
-        Parameter
-        ---------
-        wait: bool, default=False
-            True, if the calling thread should be blocked until the monitor has finished its shutdown process, false if not.
-        """
+    def shutdown(self) -> None:
+        """Stop the monitor."""
 
         self._state = RemoteMonitorState.SHUTDOWN
+
+    def join(self) -> None:
+        """Wait until the monitor listener thread terminates (if existing)."""
 
     @abstractmethod
     def update(self, state_info: Sequence[SimStateInformation], frame_id: int) -> None:
@@ -93,25 +92,38 @@ class RemoteMonitor(SimMonitor):
         super().__init__()
 
         self._conn: PConnection = conn
+        """The monitor connection for exchanging state and command messages."""
+
         self._parser: CommandParser = parser
+        """Parser for parsing incoming command messages."""
 
-        self._receive_thread: Thread = Thread(target=self._receive_loop)
+        self._monitor_thread: Thread | None = None
+        """The thread, running the monitor receive loop (if existing)."""
 
-        # start receive loop
-        self._receive_thread.start()
-
-    def shutdown(self, *, wait: bool = False) -> None:
+    def shutdown(self) -> None:
         self._conn.shutdown()
 
-        if wait:
-            self._receive_thread.join()
+    def join(self) -> None:
+        if self._monitor_thread is not None:
+            self._monitor_thread.join()
 
     def update(self, state_info: Sequence[SimStateInformation], frame_id: int) -> None:
         # TODO: Send simulation state message to monitor
         pass
 
-    def _receive_loop(self) -> None:
-        """The internal receive loop for continuously receiving monitor commands."""
+    def run(self) -> None:
+        """Continuously receive and process monitor commands.
+
+        Note: This method is blocking until the monitor connection has been closed and thus supposed to be executed in a separate thread.
+        """
+
+        if self._monitor_thread is not None:
+            logger.warning('run()-method of remote monitor %s called multiple times! Joining existing monitor thread.', self)
+            self._monitor_thread.join()
+            return
+
+        # fetch monitor thread instance
+        self._monitor_thread = current_thread()
 
         while True:
             # receive next command message
@@ -132,3 +144,9 @@ class RemoteMonitor(SimMonitor):
         self._conn.close()
 
         logger.debug('Monitor thread for %s finished!', self._conn)
+
+    def __str__(self) -> str:
+        return f'RemoteMonitor @ {self._conn}'
+
+    def __repr__(self) -> str:
+        return f'RemoteMonitor({self._conn.__repr__()})'

@@ -1,22 +1,29 @@
-from typing import Any
+from typing import Any, Final
 
+from rcsssmj.games.soccer.sim.soccer_sim_interfaces import PSoccerSimActionInterface
 from rcsssmj.sim.agent_id import AgentID
-from rcsssmj.sim.sim_agent import SimAgent
+from rcsssmj.sim.sim_agent import TypedSimAgent
 
 
-class SoccerAgent(SimAgent):
+class SoccerAgent(TypedSimAgent[PSoccerSimActionInterface]):
     """A soccer agent object in simulation."""
 
-    def __init__(self, agent_id: AgentID, team_name: str, robot_spec: Any) -> None:
+    def __init__(self, agent_id: AgentID, team_name: str, robot_spec: Any, ai: PSoccerSimActionInterface) -> None:
         """Construct a new soccer agent."""
 
         super().__init__(agent_id, team_name, robot_spec)
+
+        self.ai: Final[PSoccerSimActionInterface] = ai
+        """The action interface."""
 
         self.place_pos: tuple[float, float, float] | None = None
         """The target position to place the agent (if a agent placement is requested by some referee command)."""
 
         self.place_quat: tuple[float, float, float, float] | None = None
         """The target rotation quaternion to place the agent (if a agent placement is requested)."""
+
+    def _get_action_interface(self) -> PSoccerSimActionInterface:
+        return self.ai
 
     def relocate(self) -> None:
         """Place the object at the buffered relocation position (if existing)."""

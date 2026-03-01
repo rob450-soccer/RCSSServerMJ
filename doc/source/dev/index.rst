@@ -135,9 +135,9 @@ You can run a MyPy type checking with the following command:
 
 .. code:: bash
 
-    hatch run types:check
+    hatch run dev:check
 
-Which will effectively execute the "check" command, defined in the *pyproject.toml* file in the "types" environment (in which MyPy is installed).
+Which will effectively execute the "check" command, defined in the *pyproject.toml* file in the "dev" environment (in which MyPy is installed).
 
 
 .. _dev_fmt:

@@ -83,8 +83,8 @@ class MujocoMonitor(SimMonitor):
         # This setting counteracts some energy saving measures performed by some OS, but is required to prevent rendering from blocking the execution of the main simulation loop.
         glfw.swap_interval(0)
 
-    def shutdown(self, *, wait: bool = False) -> None:
-        super().shutdown(wait=wait)
+    def shutdown(self) -> None:
+        super().shutdown()
 
         glfw.set_window_should_close(self.window, True)
         glfw.destroy_window(self.window)

@@ -298,7 +298,7 @@ class PolicyNetwork(nn.Module):
 
 if __name__ == '__main__':
     # parse arguments
-    parser = argparse.ArgumentParser(description='The RocoCup MuJoCo Soccer Simulation Example Client.')
+    parser = argparse.ArgumentParser(description='The RoboCup MuJoCo Soccer Simulation Example Client.')
 
     robots = list(Client.ROBOT_MOTORS.keys())
 

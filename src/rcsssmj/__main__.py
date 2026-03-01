@@ -34,7 +34,7 @@ def soccer_sim() -> None:
     """
 
     # parse arguments
-    parser = argparse.ArgumentParser(description='The RocoCup MuJoCo Soccer Simulation Server.')
+    parser = argparse.ArgumentParser(description='The RoboCup MuJoCo Soccer Simulation Server.')
 
     rule_books = [str(book.value) for book in SoccerRuleBooks if book != SoccerRuleBooks.UNKNOWN]
     field_versions = [str(version.value) for version in SoccerFieldVersions if version != SoccerFieldVersions.UNKNOWN]
