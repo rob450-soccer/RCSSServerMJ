@@ -462,12 +462,12 @@ class BaseSimulation(ABC):
                 # - 100 meter distance --> 99.8% packet loss
                 packet_loss_rate_distance = 0.5 * np.tanh(np.pi * a_sensor.distances / 50.0 - np.pi) + 0.5
 
-                other_msg_mask = [not s.startswith(agent.agent_id.prefix) for s in a_sensor.sources]
+                other_msg_mask = np.array([not s.startswith(agent.agent_id.prefix) for s in a_sensor.sources], dtype=bool)
                 loss_msg_mask = np.random.rand(n_msgs) > packet_loss_rate_distance
                 msg_indices = cast(Sequence[int], np.nonzero(other_msg_mask & loss_msg_mask)[0])  # cast to int sequence as mypy complains about not being able to use a numpy array element for indexing
 
                 # filter messages for perception
-                azimuths = cast(Sequence[int], np.trunc(np.degrees(np.atan2(a_sensor.origins[1, msg_indices], a_sensor.origins[0, msg_indices])), dtype=np.int64))  # cast to int sequence as mypy complains about type mismatch
+                azimuths = cast(Sequence[int], np.trunc(np.degrees(np.atan2(a_sensor.origins[1, msg_indices], a_sensor.origins[0, msg_indices]))).astype(np.int64))  # cast to int sequence as mypy complains about type mismatch
                 filtered_messages = [a_sensor.messages[idx] for idx in msg_indices]
                 agent_perceptions.append(MicrophonePerception(a_sensor.name[prefix_length:], azimuths, filtered_messages))
 
