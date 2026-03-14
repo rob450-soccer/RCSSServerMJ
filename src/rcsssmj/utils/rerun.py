@@ -1,0 +1,137 @@
+"""
+Instructions for using the Rerun adapter:
+
+The command line option --rerun has options {none, record, stream}. Make sure 
+you have installed rerun-sdk and rerun-loader-mjcf with pip before trying to use 
+any option other than 'none'.
+
+If you choose to record, the file will be named after the starting time and 
+saved to rcssservermj/recordings/YYYY-HH-MM-SS.rrd. 
+
+If you choose to stream, a recording file will be saved to the above location. 
+The server will also stream on 127.0.0.1:9876. Run this command to watch:
+rerun --bind 127.0.0.1 --port 9876
+
+If you are streaming from an AWS EC2, also run this command locally to watch:
+ssh -i <key-path> -R 9876:localhost:9876 ubuntu@your-ec2-public-dns
+"""
+
+import logging
+import datetime
+from pathlib import Path
+from rcsssmj.sim.simulation import BaseSimulation
+
+
+sim_logger = logging.getLogger(__name__)
+
+
+# see if Rerun is set up
+SETUP = None
+try:
+    import rerun as rr
+    import rerun_loader_mjcf
+
+    SETUP = True
+except ImportError:
+    sim_logger.warning('Rerun is not set up. Recording and streaming will not work unless it is set up.')
+    SETUP = False
+
+
+class RerunAdapter:
+    def __init__(self, mode, sim: BaseSimulation):
+        """Set up recording or streaming to Rerun."""
+        global SETUP
+        self.mode = mode
+        self.sim = sim
+        self.rr_logger = None
+        self.recorder = None
+        self._record_path = None
+
+        # no-op if Rerun is not enabled
+        if self.mode == 'none':
+            return
+        if not SETUP:
+            sim_logger.error("Rerun was requested but could not be set up.")
+
+        try: 
+            rr.init('rcssservermj', spawn=False, default_enabled=True)
+
+            # set the record path
+            current_dir = Path(__file__).resolve().parent
+            project_root = current_dir.parents[2]
+            timestamp = datetime.datetime.now().strftime("%Y-%H-%M-%S")
+            self._record_path = project_root / "recordings" / f"{timestamp}.rrd"
+            self._record_path.parent.mkdir(parents=True, exist_ok=True)
+            self._record_path = str(self._record_path)
+
+            # set the sinks
+            if self.mode == "record":
+                rr.save(self._record_path)
+                sim_logger.info(f"Rerun saving recording to {self._record_path}")
+
+            elif self.mode == "stream":
+                rr.set_sinks(rr.GrpcSink("rerun+http://127.0.0.1:9876/proxy"))
+                sim_logger.info(f"Rerun streaming to localhost:9876")
+
+            elif self.mode == 'both':
+                rr.set_sinks(rr.GrpcSink("rerun+http://127.0.0.1:9876/proxy"), rr.FileSink(self._record_path))
+                sim_logger.info(f"Rerun streaming to localhost:9876 and saving to {self._record_path}. ")
+
+            self.rr_logger = rerun_loader_mjcf.MJCFLogger(self.sim.mj_model)
+            rr.set_time('sim_time', duration=0.0)
+            self.rr_logger.log_model()
+
+            self.recorder = rerun_loader_mjcf.MJCFRecorder(self.rr_logger, timeline_name="sim_time")
+
+            sim_logger.info(f"Rerun successfully set up in {self.mode} mode.")
+        
+        except Exception as e:
+            sim_logger.error(f"Rerun was requested but could not be set up due to an error: {e}")
+            SETUP = False
+
+    
+    def recompile(self, data, model):
+        """Recompile the logger and recorder when the world data is recompiled."""
+        global SETUP
+        # no-op if Rerun is not enabled
+        if not SETUP or self.mode == 'none':
+            return
+
+        try:
+            self.rr_logger = rerun_loader_mjcf.MJCFLogger(model)
+            self.recorder = rerun_loader_mjcf.MJCFRecorder(self.rr_logger, timeline_name="sim_time")
+        except Exception as e:
+            sim_logger.warning(f"There was an error with Rerun, turning it off. Error: {e}")
+            SETUP = False
+
+
+    def step(self, data, timestamp):
+        """Record/stream a single step of the simulation."""
+        global SETUP
+        # no-op if Rerun is not enabled
+        if not SETUP or self.mode == 'none':
+            return
+
+        try:
+            rr.set_time('sim_time', timestamp=timestamp)
+            self.recorder.record(data, timestamp=timestamp)
+            self.recorder.flush()
+        except Exception as e:
+            sim_logger.warning(f"There was an error with Rerun, turning it off. Error: {e}")
+            SETUP = False
+
+    def shutdown(self):
+        """Shutdown Rerun if it was active."""
+        global SETUP
+        # no-op if Rerun is not enabled
+        if not SETUP or self.mode == 'none':
+            return
+
+        if self.recorder is not None:
+            try:
+                self.recorder.flush()
+                rr.flush()
+            except Exception:
+                pass
+        
+        sim_logger.info("Rerun shut down.")
