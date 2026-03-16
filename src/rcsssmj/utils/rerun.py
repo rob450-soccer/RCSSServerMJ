@@ -99,6 +99,7 @@ class RerunAdapter:
 
         try:
             self.rr_logger = rerun_loader_mjcf.MJCFLogger(model)
+            self.rr_logger.log_model()
             self.recorder = rerun_loader_mjcf.MJCFRecorder(self.rr_logger, timeline_name="sim_time")
         except Exception as e:
             sim_logger.warning(f"There was an error with Rerun, turning it off. Error: {e}")
