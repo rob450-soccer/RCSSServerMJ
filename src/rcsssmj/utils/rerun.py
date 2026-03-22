@@ -1,19 +1,7 @@
 """
-Instructions for using the Rerun adapter:
+Rerun adapter
 
-The command line option --rerun has options {none, record, stream}. Make sure 
-you have installed rerun-sdk and rerun-loader-mjcf with pip before trying to use 
-any option other than 'none'.
-
-If you choose to record, the file will be named after the starting time and 
-saved to rcssservermj/recordings/YYYY-HH-MM-SS.rrd. 
-
-If you choose to stream, a recording file will be saved to the above location. 
-The server will also stream on 127.0.0.1:9876. Run this command to watch:
-rerun --bind 127.0.0.1 --port 9876
-
-If you are streaming from an AWS EC2, also run this command locally to watch:
-ssh -i <key-path> -R 9876:localhost:9876 ubuntu@your-ec2-public-dns
+Instructions can be found in rcssservermj/recordings/README.md
 """
 
 import logging
@@ -71,7 +59,7 @@ class RerunAdapter:
 
             elif self.mode == "stream":
                 rr.set_sinks(rr.GrpcSink("rerun+http://127.0.0.1:9876/proxy"))
-                sim_logger.info(f"Rerun streaming to localhost:9876")
+                sim_logger.info("Rerun streaming to localhost:9876. Run `rerun --bind 127.0.0.1 --port 9876` to watch.")
 
             elif self.mode == 'both':
                 rr.set_sinks(rr.GrpcSink("rerun+http://127.0.0.1:9876/proxy"), rr.FileSink(self._record_path))
