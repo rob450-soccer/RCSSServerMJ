@@ -37,7 +37,8 @@ class SoccerSimulation(BaseSimulation):
         field: SoccerField,
         rules: SoccerRules | None = None,
         referee: SoccerReferee | None = None,
-        rerun_mode: str | None = None
+        rerun_mode: str | None = None,
+        rerun_file: str | None = None
     ) -> None:
         """Construct a new simulation sever.
 
@@ -54,6 +55,9 @@ class SoccerSimulation(BaseSimulation):
         
         rerun_mode: str | None, default=None
             The mode for recording or streaming to Rerun.
+
+        rerun_file: str | None, default=None
+            The file to record to.
         """
 
         super().__init__(vision_interval=2)
@@ -69,6 +73,9 @@ class SoccerSimulation(BaseSimulation):
 
         self.rerun_mode: str = 'none' if rerun_mode is None else rerun_mode
         """The mode determining if the simulation is recorded or streamed for Rerun."""
+
+        self.rerun_file: str = 'none' if rerun_file is None else rerun_file
+        """The file to record to."""
 
         self.game_state: Final[GameState] = GameState()
         """The current soccer game state."""
@@ -135,7 +142,7 @@ class SoccerSimulation(BaseSimulation):
         self.referee.reset()
 
         # set up the Rerun streaming
-        self.rerun: RerunAdapter = RerunAdapter(self.rerun_mode, self)
+        self.rerun: RerunAdapter = RerunAdapter(self.rerun_mode, self, self.rerun_file)
 
         return True
 

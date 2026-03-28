@@ -26,7 +26,7 @@ except ImportError:
 
 
 class RerunAdapter:
-    def __init__(self, mode, sim: BaseSimulation):
+    def __init__(self, mode, sim: BaseSimulation, file: str | None = None):
         """Set up recording or streaming to Rerun."""
         global SETUP
         self.mode = mode
@@ -48,7 +48,7 @@ class RerunAdapter:
             current_dir = Path(__file__).resolve().parent
             project_root = current_dir.parents[2]
             timestamp = datetime.datetime.now().strftime("%Y-%H-%M-%S")
-            self._record_path = project_root / "recordings" / f"{timestamp}.rrd"
+            self._record_path = project_root / "recordings" / f"{file + '_' if file else ''}{timestamp}.rrd"
             self._record_path.parent.mkdir(parents=True, exist_ok=True)
             self._record_path = str(self._record_path)
 
