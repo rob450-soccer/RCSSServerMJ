@@ -52,6 +52,10 @@ class MujocoMonitor(SimMonitor):
 
         glfw.init()
         glfw.window_hint(glfw.SCALE_TO_MONITOR, glfw.TRUE)
+        # added by felicia
+        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_COMPAT_PROFILE)
 
         primary_monitor = glfw.get_primary_monitor()
         video_mode = glfw.get_video_mode(primary_monitor)
@@ -230,6 +234,8 @@ class MujocoMonitor(SimMonitor):
             # fmt: on
 
             if GL is not None:
+                # added by felicia
+                # GL.glPushAttrib(GL.GL_ENABLE_BIT | GL.GL_DEPTH_BUFFER_BIT | GL.GL_COLOR_BUFFER_BIT | GL.GL_TRANSFORM_BIT | GL.GL_CURRENT_BIT | GL.GL_TEXTURE_BIT)
                 GL.glPushAttrib(GL.GL_ALL_ATTRIB_BITS)
                 GL.glDisable(GL.GL_DEPTH_TEST)
                 GL.glDisable(GL.GL_LIGHTING)
@@ -281,7 +287,7 @@ class MujocoMonitor(SimMonitor):
                 GL.glPopMatrix()
                 GL.glMatrixMode(GL.GL_PROJECTION)
                 GL.glPopMatrix()
-
+                GL.glMatrixMode(GL.GL_MODELVIEW)
                 GL.glPopAttrib()
                 GL.glMatrixMode(GL.GL_MODELVIEW)
 

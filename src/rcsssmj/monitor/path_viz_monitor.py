@@ -285,8 +285,14 @@ class PathVizMonitor(MujocoMonitor):
             tx0       = rx1 + 10
             tx1       = tx0 + time_box_w
 
-            if GL is not None:
-                GL.glPushAttrib(GL.GL_ALL_ATTRIB_BITS)
+            # glfw.make_context_current(self.window)
+            if GL is not None and glfw.get_current_context() == self.window:
+                # Save state manually (glPushAttrib removed in GL 3.1+ core)
+                prev_depth_test = bool(GL.glIsEnabled(GL.GL_DEPTH_TEST))
+                prev_blend      = bool(GL.glIsEnabled(GL.GL_BLEND))
+                prev_blend_src  = GL.glGetIntegerv(GL.GL_BLEND_SRC_ALPHA)
+                prev_blend_dst  = GL.glGetIntegerv(GL.GL_BLEND_DST_ALPHA)
+
                 GL.glDisable(GL.GL_DEPTH_TEST)
                 GL.glDisable(GL.GL_LIGHTING)
                 GL.glDisable(GL.GL_CULL_FACE)
@@ -325,11 +331,20 @@ class PathVizMonitor(MujocoMonitor):
                 GL.glVertex2f(rx1, y1); GL.glVertex2f(rx0, y1)
                 GL.glEnd()
 
-                GL.glPopMatrix()
+                GL.glPopMatrix()                    # pop GL_MODELVIEW
                 GL.glMatrixMode(GL.GL_PROJECTION)
-                GL.glPopMatrix()
-                GL.glPopAttrib()
+                GL.glPopMatrix()                    # pop GL_PROJECTION
                 GL.glMatrixMode(GL.GL_MODELVIEW)
+
+                # Restore state manually
+                if prev_depth_test:
+                    GL.glEnable(GL.GL_DEPTH_TEST)
+                else:
+                    GL.glDisable(GL.GL_DEPTH_TEST)
+                if prev_blend:
+                    GL.glEnable(GL.GL_BLEND)
+                else:
+                    GL.glDisable(GL.GL_BLEND)
 
             for txt, x0 in [(left_team_txt, lx0), (right_team_txt, rx0)]:
                 mujoco.mjr_text(
