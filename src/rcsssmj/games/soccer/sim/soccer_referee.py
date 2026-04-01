@@ -56,8 +56,7 @@ class SoccerReferee:
         self.game.game_state.agent_na_touch_ball = None
         self.game.game_state.team_na_score = team_side
 
-        self.game.ball.place_pos = (0, 0)
-        self.game.ball.reset_contacts()
+        self.game.ball.drop_at(0, 0)
 
     def play_on(self) -> None:
         """Instruct the normal progressing of the game."""
@@ -81,8 +80,7 @@ class SoccerReferee:
         self.game.game_state.team_na_score = None
 
         y = self.game.field.field_area.min_y if self.game.ball.xpos[1] < 0 else self.game.field.field_area.max_y
-        self.game.ball.place_pos = (self.game.ball.xpos[0], y)
-        self.game.ball.reset_contacts()
+        self.game.ball.drop_at(self.game.ball.xpos[0], y)
 
     def corner_kick(self, team_side: TeamSide) -> None:
         """Instruct corner kick for the given team.
@@ -101,8 +99,7 @@ class SoccerReferee:
 
         x = self.game.field.field_area.max_x if team_side == TeamSide.LEFT else self.game.field.field_area.min_x
         y = self.game.field.field_area.min_y if self.game.ball.xpos[1] < 0 else self.game.field.field_area.max_y
-        self.game.ball.place_pos = (x, y)
-        self.game.ball.reset_contacts()
+        self.game.ball.drop_at(x, y)
 
     def goal_kick(self, team_side: TeamSide) -> None:
         """Instruct goal kick for the given team.
@@ -119,8 +116,8 @@ class SoccerReferee:
         self.game.game_state.agent_na_touch_ball = None
         self.game.game_state.team_na_score = None
 
-        self.game.ball.place_pos = self.game.field.left_goalie_area.center() if team_side == TeamSide.LEFT else self.game.field.right_goalie_area.center()
-        self.game.ball.reset_contacts()
+        drop_pos = self.game.field.left_goalie_area.center() if team_side == TeamSide.LEFT else self.game.field.right_goalie_area.center()
+        self.game.ball.drop_at(drop_pos[0], drop_pos[1])
 
     def offsite(self, team_side: TeamSide) -> None:
         """Offsite state for the given team.
@@ -173,8 +170,7 @@ class SoccerReferee:
         self.game.game_state.agent_na_touch_ball = None
         self.game.game_state.team_na_score = team_side
 
-        self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1])
-        self.game.ball.reset_contacts()
+        self.game.ball.drop()
 
     def direct_free_kick(self, team_side: TeamSide) -> None:
         """Instruct a direct free kick for the given team.
@@ -191,8 +187,7 @@ class SoccerReferee:
         self.game.game_state.agent_na_touch_ball = None
         self.game.game_state.team_na_score = None
 
-        self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1])
-        self.game.ball.reset_contacts()
+        self.game.ball.drop()
 
     def penalty_kick(self, team_side: TeamSide) -> None:
         """Instruct a penalty kick for the given team.
@@ -210,8 +205,7 @@ class SoccerReferee:
         self.game.game_state.team_na_score = None
 
         penalty_spot_x = self.game.field.field_area.max_x - self.game.field.penalty_spot_distance
-        self.game.ball.place_pos = (-penalty_spot_x if team_side == TeamSide.LEFT else penalty_spot_x, 0)
-        self.game.ball.reset_contacts()
+        self.game.ball.drop_at(-penalty_spot_x if team_side == TeamSide.LEFT else penalty_spot_x)
 
     def penalty_shoot(self, team_side: TeamSide) -> None:
         """Instruct a penalty shoot for the given team.
@@ -236,7 +230,10 @@ class SoccerReferee:
         """
 
         self._did_act = True
-        self.game.ball.place_pos = (self.game.ball.xpos[0], self.game.ball.xpos[1]) if pos is None else pos
+        if pos is not None:
+            self.game.ball.drop_at(pos[0], pos[1])
+        else:
+            self.game.ball.drop()
         # TODO: cause relocation of all agents nearby the ball (within a radius defined here)
 
         self.game.game_state.set_play_mode(PlayMode.PLAY_ON)

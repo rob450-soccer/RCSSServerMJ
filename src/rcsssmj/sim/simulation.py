@@ -449,7 +449,7 @@ class BaseSimulation(ABC):
 
             # audio perception
             a_sensor = self._a_data.sensors.get(agent.agent_id.prefix + 'hear', None)
-            if a_sensor is not None:
+            if a_sensor is not None and a_sensor.messages:
                 n_msgs = len(a_sensor.messages)
 
                 # TODO: Introduce loss probability based on message volume and ambient volume.

@@ -25,7 +25,7 @@ class GameState:
         self._play_mode: PlayMode = PlayMode.BEFORE_KICK_OFF
         """The current play mode."""
 
-        self._play_mode_history_ms: dict[PlayMode, float] = {pm: 0 for pm in PlayMode}
+        self._play_mode_history: dict[PlayMode, float] = {pm: 0.0 for pm in PlayMode}
         """The play mode time history."""
 
         self._left_team_name: str | None = None
@@ -53,7 +53,7 @@ class GameState:
         self._play_time_ms = 0
         self._play_time = 0.0
         self._play_mode = PlayMode.BEFORE_KICK_OFF
-        self._play_mode_history_ms = {pm: 0 for pm in PlayMode}
+        self._play_mode_history = {pm: 0.0 for pm in PlayMode}
 
         self._left_team_name = None
         self._right_team_name = None
@@ -119,7 +119,7 @@ class GameState:
             The play mode for which to return the last activation time, or None to use the currently active play mode.
         """
 
-        return self._play_mode_history_ms[self._play_mode if play_mode is None else play_mode] / 1000.0
+        return self._play_mode_history[self._play_mode if play_mode is None else play_mode]
 
     def get_play_mode_age(self, play_mode: PlayMode | None = None) -> float:
         """Return the play time that has passed since the play mode has been set.
@@ -130,7 +130,7 @@ class GameState:
             The play mode for which to return the age, or None to use the currently active play mode.
         """
 
-        return (self._play_time_ms - self._play_mode_history_ms[self._play_mode if play_mode is None else play_mode]) / 1000.0
+        return self._play_time - self._play_mode_history[self._play_mode if play_mode is None else play_mode]
 
     def update_team_names(self, team_name: str) -> None:
         """Update the available team names of the game."""
@@ -164,7 +164,7 @@ class GameState:
         """
 
         self._play_mode = play_mode
-        self._play_mode_history_ms[play_mode] = self._play_time_ms
+        self._play_mode_history[play_mode] = self._play_time
 
     def set_play_mode_for_team(self, team_side: TeamSide, play_mode_left: PlayMode, play_mode_right: PlayMode) -> None:
         """Set the play mode of the game state based on the given team side.
@@ -222,6 +222,7 @@ class GameState:
 
         if progress_play_time:
             self._play_time_ms += int(0.5 + dt * 1000)
+            self._play_time = self._play_time_ms / 1000.0
 
     def goal(self, team_side: TeamSide) -> None:
         """Count a goal for the given team and set the play mode accordingly.

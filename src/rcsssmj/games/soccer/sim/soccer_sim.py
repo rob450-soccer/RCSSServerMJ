@@ -520,20 +520,6 @@ class SoccerSimulation(BaseSimulation):
         # referee game
         self.referee.referee()
 
-        # relocate objects as requested by referee
-        self._relocate_objects()
-
-    def _relocate_objects(self) -> None:
-        """Relocate objects as requested by referee."""
-
-        # relocate ball
-        self.ball.relocate()
-
-        # relocate players
-        for players in self._team_players.values():
-            for player in players.values():
-                player.relocate()
-
     def _generate_game_state_perception(self) -> Perception:
         return GameStatePerception(
             play_time=self.game_state.play_time,
@@ -594,17 +580,16 @@ class SoccerSimulation(BaseSimulation):
         if player is None:
             return
 
-        x_factor = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
+        side_factor = -1 if agent_id.team_id == TeamSide.LEFT.value else 1
         theta_shift = 0 if agent_id.team_id == TeamSide.LEFT.value else pi
 
-        pos = (abs(beam_pose[0]) * x_factor, beam_pose[1], 0.6745)
+        x = abs(beam_pose[0]) * side_factor
+        y = beam_pose[1]
         theta = beam_pose[2] + theta_shift
-        quat = quat_from_axis_angle((0, 0, 1), theta)
 
-        logger.debug('Beam team #%d player #%02d to (%.3f, %.3f, %.3f)', agent_id.team_id, agent_id.player_no, pos[0], pos[1], degrees(theta))
+        logger.debug('Beam team #%d player #%02d to (%.3f, %.3f, %.3f)', agent_id.team_id, agent_id.player_no, x, y, degrees(theta))
 
-        player.place_at(pos, quat)
-        player.init_joints()
+        player.drop_at(x, y, theta)
 
     def request_kick_off(self, team_side: TeamSide | int) -> None:
         """Instruct kickoff for the given team.
@@ -644,7 +629,8 @@ class SoccerSimulation(BaseSimulation):
             The ball velocity.
         """
 
-        self.ball.place_pos = pos[0:2]
+        self.ball.place_at(pos)
+        # TODO: Set velocity...
 
     def request_place_player(
         self,
@@ -683,7 +669,7 @@ class SoccerSimulation(BaseSimulation):
         # check if player exists
         player = self._team_players[team_id.value].get(player_id, None)
         if player is not None:
-            player.place_pos = pos
-            player.place_quat = quat
+            player.place_at(pos, quat)
+            player.init_joints()
         else:
             logger.warning('Player %d of team %s does not exist!', player_id, team_name)

@@ -6,7 +6,7 @@ The RoboCup Soccer Simulation Server based on the MuJoCo physics engine.
 
 ![Soccer Simulation Screenshot](https://gitlab.com/robocup-sim/rcssservermj/-/raw/master/doc/source/_static/img/screenshot-T1.png)
 
-__Video__: [https://youtu.be/iYWw7vATQU4](https://youtu.be/iYWw7vATQU4)
+__Video__: [https://youtu.be/f6MvmqiiU6Q](https://youtu.be/f6MvmqiiU6Q)
 
 ## Documentation
 
@@ -27,13 +27,13 @@ For more detailed installation instructions (virtual environments, installation 
 Start the soccer simulation server:
 
 ```bash
-rcssservermj -a 127.0.0.1 -p 60000 -m 60001
+rcssservermj -a 127.0.0.1 -c 60000 -m 60001
 ```
 
 CLI parameter:
 
 - `-a <ip>` to specify the server IP (default: 'localhost')
-- `-p <agent_port>` to specify the agent port (default: 60000)
+- `-c <agent_port>` to specify the agent port (default: 60000)
 - `-m <monitor_port>` to specify the monitor port (default: 60001)
 
 Stop the server: Simply <kbd>ctrl+c</kbd> the server process.

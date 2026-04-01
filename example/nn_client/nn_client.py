@@ -11,8 +11,8 @@ import numpy as np
 import re
 from scipy.spatial.transform import Rotation as R
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+
+from torch_policy import load_policy_from_files
 
 # ---------- LOGGING CONFIG ----------
 # console handler
@@ -34,7 +34,7 @@ class Client:
     """
 
     BEAM_POSES: ClassVar[Mapping[int, tuple[float, float, float]]] = {
-        1: (29.0, 0.0, 0),
+        1: (27.5, 0.0, 0),
         2: (22.0, 12.0, 0),
         3: (22.0, 4.0, 0),
         4: (22.0, -4.0, 0),
@@ -63,6 +63,11 @@ class Client:
         self._model_name: str = 'ant' if model_name is None else model_name
         self._team: str = team
         self._player_no: int = player_no
+
+        self._policy_checkpoint = "locomotion_nn.pth"
+        self._policy_meta = "locomotion_nn_meta.json"
+        self._gait_period = 1.0
+        self._policy_dt = 0.02
 
         self._rcv_buffer_size = 1024
         self._rcv_buffer = bytearray(self._rcv_buffer_size)
@@ -106,110 +111,144 @@ class Client:
 
         self._sock.shutdown(socket.SHUT_RDWR)
 
+    def _init_policy_runtime_state(self):
+        self.previous_action = np.zeros(self.nr_joints, dtype=np.float32)
+        self.policy_hidden = self.policy.initialize_carry(batch_size=1, device=self.device)
+
+        self.wait_until_walking = 50
+
+        self.gait_phase_offset = np.array([0.0, -np.pi], dtype=np.float32)
+        self.gait_phase = self.gait_phase_offset.copy()
+        self.gait_mean_freq = 1.0 / self._gait_period
+        self.gait_freq = self.gait_mean_freq
+        self.gait_phase_dt = (2.0 * np.pi * self._policy_dt) * self.gait_freq
+
+    @staticmethod
+    def _wrap_to_pi(x: np.ndarray) -> np.ndarray:
+        return (x + np.pi) % (2.0 * np.pi) - np.pi
+
+    def _get_gait_phase_features(self) -> np.ndarray:
+        phase_tp1 = self._wrap_to_pi(self.gait_phase + self.gait_phase_dt)
+        return np.concatenate([np.sin(phase_tp1), np.cos(phase_tp1)], axis=-1).astype(np.float32)
+
+    def _step_gait_manager(self):
+        self.gait_phase = self._wrap_to_pi(self.gait_phase + self.gait_phase_dt).astype(np.float32)
+
     def _action_loop(self):
         """
         Main loop of the agent.
         """
 
         self.nr_joints = len(self.ROBOT_MOTORS[self._model_name])
-        self.previous_action = np.zeros(self.nr_joints)
+
         self.p_gain = 25.0
         self.d_gain = 0.6
         self.scaling_factor = 0.5
         self.joint_nominal_position = np.array([
             0.0, 0.0,
-            0.0, 1.4, 0.0, -0.4,
-            0.0, -1.4, 0.0, 0.4,
+            0.0, -1.4, 0.0, -0.4,
+            0.0, 1.4, 0.0, 0.4,
             0.0,
             -0.4, 0.0, 0.0, 0.8, -0.4, 0.0,
-            0.4, 0.0, 0.0, -0.8, 0.4, 0.0,
-        ])
-        self.train_sim_flip = np.array([
-            1.0, -1.0,
-            1.0, -1.0, -1.0, 1.0,
-            -1.0, -1.0, 1.0, 1.0,
-            1.0,
-            1.0, -1.0, -1.0, 1.0, 1.0, -1.0,
-            -1.0, -1.0, -1.0, -1.0, -1.0, -1.0
-        ])
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.policy = PolicyNetwork().to(self.device)
-        self.policy.load_state_dict(torch.load("locomotion_nn.pth", map_location=self.device))
+            -0.4, 0.0, 0.0, 0.8, -0.4, 0.0,
+        ], dtype=np.float32)
 
-        # Connect to the server
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.policy, self.policy_meta = load_policy_from_files(
+            self._policy_checkpoint,
+            self._policy_meta,
+            self.device,
+        )
+        self._init_policy_runtime_state()
+
         logger.info('Initializing agent...')
         init_msg = f'(init {self._model_name} {self._team} {self._player_no})'
         self._send_message(init_msg.encode())
-
-        wait_until_walking = 50
 
         logger.info('Running perception-action-loop.')
         while True:
             try:
                 perception_msg = self._receive_message()
+
+                # Beam first, but do not advance GRU or gait state yet
+                if not self._has_beamed:
+                    beam_pose = self.BEAM_POSES[self._player_no]
+                    action_msg = f'(beam {beam_pose[0]} {beam_pose[1]} {beam_pose[2]})'
+                    self._send_message(action_msg.encode())
+                    self._has_beamed = True
+                    self._init_policy_runtime_state()
+                    continue
+
                 perception_msg_str = perception_msg.decode()
                 perception_data = self.parse_sensor_string(perception_msg_str)
 
-                joint_pos_degrees = np.array([h["ax"] for h in perception_data["HJ"]])
-                joint_pos = np.deg2rad(joint_pos_degrees)
+                joint_pos_degrees = np.array([h["ax"] for h in perception_data["HJ"]], dtype=np.float32)
+                joint_pos = np.deg2rad(joint_pos_degrees).astype(np.float32)
 
-                joint_vel_degrees = np.array([h["vx"] for h in perception_data["HJ"]])
-                joint_vel = np.deg2rad(joint_vel_degrees)
+                joint_vel_degrees = np.array([h["vx"] for h in perception_data["HJ"]], dtype=np.float32)
+                joint_vel = np.deg2rad(joint_vel_degrees).astype(np.float32)
 
-                qpos_qvel_previous_action = np.vstack(([
-                    ((joint_pos * self.train_sim_flip) - self.joint_nominal_position) / 4.6,
-                    joint_vel / 110.0 * self.train_sim_flip,
-                    self.previous_action / 10.0,
-                ])).T.flatten()
-                
-                ang_vel = np.clip(np.deg2rad(perception_data["GYR"]["rt"]) / 50.0, -1.0, 1.0)
-                orientation_quat_mj_convention = perception_data["quat"]["q"]
+                scaled_joint_pos = (joint_pos - self.joint_nominal_position) / 3.14
+                scaled_joint_vel = joint_vel / 100.0
+                scaled_previous_action = self.previous_action / 10.0
+
+                ang_vel = np.deg2rad(np.array(perception_data["GYR"]["rt"], dtype=np.float32)).astype(np.float32)
+                scaled_and_clipped_ang_vel = np.clip(ang_vel / 50.0, -1.0, 1.0)
+
+                orientation_quat_mj_convention = np.array(perception_data["quat"]["q"], dtype=np.float32)
                 orientation_quat_inv = R.from_quat([
                     orientation_quat_mj_convention[1],
                     orientation_quat_mj_convention[2],
                     orientation_quat_mj_convention[3],
                     orientation_quat_mj_convention[0],
                 ]).inv()
-                projected_gravity = orientation_quat_inv.apply(np.array([0.0, 0.0, -1.0]))
+                projected_gravity = orientation_quat_inv.apply(np.array([0.0, 0.0, -1.0], dtype=np.float32)).astype(np.float32)
 
-                wait_until_walking = max(0, wait_until_walking - 1)
-                if wait_until_walking > 0:
-                    goal_vel = np.array([0.0, 0.0, 0.0])
+                self.wait_until_walking = max(0, self.wait_until_walking - 1)
+                if self.wait_until_walking > 0:
+                    goal_vel = np.array([0.0, 0.0, 0.0], dtype=np.float32)
                 else:
-                    goal_vel = np.array([0.5, 0.0, 0.0])
+                    goal_vel = np.array([1.0, 0.0, 0.0], dtype=np.float32) # desired x, y and yaw velocity (trained from -1.0 to 1.0)
+
+                gait_phase_features = self._get_gait_phase_features()
 
                 observation = np.concatenate([
-                    qpos_qvel_previous_action,
-                    ang_vel,
+                    scaled_joint_pos,
+                    scaled_joint_vel,
+                    scaled_previous_action,
+                    scaled_and_clipped_ang_vel,
                     goal_vel,
+                    gait_phase_features,
                     projected_gravity,
                 ])
+
+                observation = np.nan_to_num(observation, nan=0.0, posinf=0.0, neginf=0.0)
                 observation = np.clip(observation, -10.0, 10.0)
 
-                nn_action = self.policy(torch.tensor(observation, dtype=torch.float32).to(self.device)).detach().cpu().numpy()
-
+                with torch.no_grad():
+                    obs_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+                    action_tensor, next_policy_hidden = self.policy(obs_tensor, self.policy_hidden)
+                nn_action = action_tensor.squeeze(0).cpu().numpy().astype(np.float32)
                 target_joint_positions = self.joint_nominal_position + self.scaling_factor * nn_action
-                target_joint_positions *= self.train_sim_flip
 
                 msg_list: list[str] = []
+                motors = self.ROBOT_MOTORS[self._model_name]
+                target_joint_positions_degrees = np.rad2deg(target_joint_positions)
 
-                if not self._has_beamed:
-                    beam_pose = self.BEAM_POSES[self._player_no]
-                    msg_list.append(f'(beam {beam_pose[0]} {beam_pose[1]} {beam_pose[2]})')
-                    self._has_beamed = True
-                else:
-                    motors = self.ROBOT_MOTORS[self._model_name]
-                    target_joint_positions_degrees = np.rad2deg(target_joint_positions)
-                    for motor, target_joint_position in zip(motors, target_joint_positions_degrees, strict=False):
-                        msg_list.append(f'({motor} {target_joint_position:.2f} 0.0 {self.p_gain:.2f} {self.d_gain:.2f} 0.0)')
+                for motor, target_joint_position in zip(motors, target_joint_positions_degrees, strict=False):
+                    msg_list.append(f'({motor} {target_joint_position:.2f} 0.0 {self.p_gain:.2f} {self.d_gain:.2f} 0.0)')
 
-                    self.previous_action = nn_action
+                self.previous_action = nn_action
+                self.policy_hidden = next_policy_hidden
+                self._step_gait_manager()
 
                 # send action message
                 action_msg = ''.join(msg_list)
                 self._send_message(action_msg.encode())
-            except Exception:
-                logger.info('Server connection closed.')
+            
+            except Exception as e:
+                logger.info('Server connection closed or client crashed.')
+                logger.info('Exception details:', exc_info=e.__traceback__)
                 break
 
     def _send_message(self, msg: bytes | bytearray) -> None:
@@ -276,24 +315,6 @@ class Client:
                 result[tag] = group
         
         return result
-
-
-class PolicyNetwork(nn.Module):
-    def __init__(self):
-        super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(78, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 128)
-        self.fc4 = nn.Linear(128, 23)
-        self.layer_norm = nn.LayerNorm(512, eps=1e-6)
-
-    def forward(self, x):
-        x = F.elu(self.layer_norm(self.fc1(x)))
-        x = F.elu(self.fc2(x))
-        x = F.elu(self.fc3(x))
-        x = self.fc4(x)
-        x = torch.clip(x, -10.0, 10.0)
-        return x
 
 
 if __name__ == '__main__':
