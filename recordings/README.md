@@ -13,10 +13,18 @@ Install dependencies first:
 pip install rerun-sdk rerun-loader-mjcf
 ```
 
+You will also need to install `rerun-sdk` wherever you plan to run Rerun from. 
+
 ## CLI flags
 
 - `--rerun {none,record,stream,both}`
 - `--rerunfile <name>` (optional)
+
+Example full calls: 
+
+```hatch run rcssservermj --no-render --rerun stream```
+
+```hatch run rcssservermj --no-render --rerun record --rerunfile test```
 
 ## Record mode
 
