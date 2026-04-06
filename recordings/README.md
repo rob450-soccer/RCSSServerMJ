@@ -1,32 +1,64 @@
 # Streaming/recording to Rerun
 
-The command line option `--rerun` has options `{none, record, stream, both}`. Make sure you have installed `rerun-sdk` and `rerun-loader-mjcf` with pip before trying to use any option other than `none` (which is the default).
+The simulator supports Rerun via the `--rerun` CLI option:
 
-If you choose to record, the file will be named after the starting time and saved to `rcssservermj/recordings/YYYY-HH-MM-SS.rrd`. To change the name of this file, pass in the desired name to the `--rerun-file` command-line argument. Do not include the .rrd extension. The timestamp will still be appended after the desired filename. 
+- `none` (default)
+- `record`
+- `stream`
+- `both`
 
-If you choose to stream, the server will stream on 127.0.0.1:9876. Run this command to watch:
-```rerun --bind 127.0.0.1 --port 9876```
+Install dependencies first:
 
-If you are streaming from an AWS EC2, also run this command locally to watch:
-```ssh -i <key-path> -R 9876:localhost:9876 ubuntu@your-ec2-public-dns```
+```bash
+pip install rerun-sdk rerun-loader-mjcf
+```
 
-If you are streaming from CAEN, run this command locally to watch:
-```ssh -R 9876:localhost:9876 uniqname@login.engin.umich.edu```
+## CLI flags
 
-# Uploading data to Google Drive
+- `--rerun {none,record,stream,both}`
+- `--rerunfile <name>` (optional)
 
-To protect local storage space, you can also upload the files to Google Drive. Add the command-line option `--upload` to do so. This requires `rclone` to be set up.
+## Record mode
+
+In `record` or `both` mode, `.rrd` files are written to `rcssservermj/recordings/`.
+
+Filename format:
+
+- default: `YYYY-HH-MM-SS.rrd`
+- with `--rerunfile name`: `name_YYYY-HH-MM-SS.rrd`
+
+## Stream mode
+
+In `stream` or `both` mode, the server streams to `127.0.0.1:9876`.
+
+Run the Rerun viewer:
+
+```bash
+rerun --bind 127.0.0.1 --port 9876
+```
+
+### Remote server (e.g., EC2)
+
+If the simulator runs on a remote machine, open a reverse SSH tunnel from your local machine:
+
+```bash
+ssh -i <key-path> -R 9876:localhost:9876 ubuntu@your-ec2-public-dns
+```
+
+## Uploading data to Google Drive
+
+To protect local storage space, you can upload generated `.rrd` files to Google Drive using `rclone`.
 
 ## `rclone` setup
 
-```
+```bash
 curl https://rclone.org/install.sh | sudo bash
 rclone config
 ```
 
 Options to pick, in order, while leaving other things empty:
 
-```
+```text
 n) New remote
 google_drive
 24
@@ -39,8 +71,10 @@ y) Yes this is OK (default)
 q) Quit config
 ```
 
-Add the shared rob450-data folder to My Drive (it must be in the first level of Drive, not in shared with me or in a subfolder, to keep the upload command the same for everybody).
+Add the shared `rob450-data` folder to My Drive (it must be in the first level of Drive, not in "Shared with me" or in a subfolder, to keep the upload command the same for everybody).
 
-Test by creating a test.txt file and running this to see if it shows up in the shared data foler: 
+Test by creating a test file and running:
 
-```rclone copy test.txt google_drive:/rob450-data --progress```
+```bash
+rclone copy test.txt google_drive:/rob450-data --progress
+```

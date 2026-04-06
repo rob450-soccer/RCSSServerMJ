@@ -15,7 +15,7 @@ class SoccerBall(SimObject):
 
         super().__init__('ball')
 
-        self._radius: float = 0.117
+        self._radius: float = 0.11
         """The radius of the ball."""
 
         self._active_contact: AgentID | None = None
@@ -45,7 +45,7 @@ class SoccerBall(SimObject):
 
         return self._last_contact
 
-    def init(self, mj_spec: Any, mj_model: Any, mj_data: Any, radius: float = 0.117) -> None:
+    def init(self, mj_spec: Any, mj_model: Any, mj_data: Any, radius: float = 0.11) -> None:
         """(Re-)Initialize the ball instance."""
 
         self.bind(mj_model, mj_data)
