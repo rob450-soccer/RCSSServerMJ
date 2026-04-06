@@ -24,9 +24,6 @@ class SoccerBall(SimObject):
         self._last_contact: AgentID | None = None
         """The previous agent contact (updated after the active contact has changed / has been lost)."""
 
-        self.place_pos: tuple[float, float] | None = None
-        """The target position to place the ball (if a ball placement is requested by some referee command)."""
-
     @property
     def radius(self) -> float:
         """The radius of the ball."""
@@ -50,11 +47,12 @@ class SoccerBall(SimObject):
 
         self.bind(mj_model, mj_data)
 
+        # TODO: Fetch actual radius from model spec.
+
         self._prev_xpos = self.xpos.astype(np.float64)
         self._radius = radius
         self._active_contact = None
         self._last_contact = None
-        self.place_pos = None
 
     def _set_active_contact(self, contact: AgentID | None) -> None:
         """Set the currently active agent contact.
@@ -92,10 +90,23 @@ class SoccerBall(SimObject):
         else:
             self._set_active_contact(None)
 
-    def relocate(self) -> None:
-        """Place the object at the buffered relocation position (if existing)."""
+    def drop(self) -> None:
+        """Drop the ball at its current location and reset all contacts."""
 
-        if self.place_pos is not None:
-            self.place_at((self.place_pos[0], self.place_pos[1], self._radius))
+        self.place_at((self.xpos[0], self.xpos[1], self.radius))
+        self.reset_contacts()
 
-            self.place_pos = None
+    def drop_at(self, x: float = 0.0, y: float = 0.0) -> None:
+        """Drop the ball at the specified location and reset all contacts.
+
+        Parameter
+        ---------
+        x: float, default=0.0
+            The x-position at which to drop the ball.
+
+        y: float, default=0.0
+            The y-position at which to drop the ball.
+        """
+
+        self.place_at((x, y, self.radius))
+        self.reset_contacts()

@@ -6,6 +6,7 @@ from threading import Lock, Thread
 from typing import TYPE_CHECKING, Final, Generic, Protocol, TypeVar
 
 from rcsssmj.monitor.mujoco_monitor import MujocoMonitor
+from rcsssmj.monitor.path_viz_monitor import PathVizMonitor
 from rcsssmj.server.remote_agent import RemoteAgent, RemoteAgentState
 from rcsssmj.server.remote_monitor import RemoteMonitor, RemoteMonitorState, SimMonitor
 from rcsssmj.sim.commands import MonitorCommand
@@ -230,7 +231,7 @@ class SimServer(Generic[S]):
         # create internal monitor
         if self.render:
             with self._mutex:
-                self._monitors.append(MujocoMonitor(self.sim.mj_model, 2))
+                self._monitors.append(PathVizMonitor(self.sim.mj_model, 2))
 
         # run simulation update loop
         if self.sequential_mode:
@@ -281,6 +282,7 @@ class SimServer(Generic[S]):
 
             # collect monitor commands
             monitor_commands = self._collect_commands(active_monitors)
+            monitor_commands.extend(self._collect_commands(monitors_to_remove))
 
             # progress simulation
             self.sim.step(monitor_commands)
@@ -329,6 +331,7 @@ class SimServer(Generic[S]):
 
             # collect monitor commands
             monitor_commands = self._collect_commands(active_monitors)
+            monitor_commands.extend(self._collect_commands(monitors_to_remove))
 
             # progress simulation
             self.sim.step(monitor_commands)
