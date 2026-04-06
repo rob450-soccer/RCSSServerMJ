@@ -231,7 +231,7 @@ class SimServer(Generic[S]):
         # create internal monitor
         if self.render:
             with self._mutex:
-                self._monitors.append(PathVizMonitor(self.sim.mj_model, 2))
+                self._monitors.append(MujocoMonitor(self.sim.mj_model, 2))
 
         # run simulation update loop
         if self.sequential_mode:
