@@ -287,6 +287,9 @@ class SimServer(Generic[S]):
             # progress simulation
             self.sim.step(monitor_commands)
 
+            # record this simulation step
+            self.sim.rerun.step(self.sim.mj_data, self.sim.sim_time)
+
             # update connected monitors
             self._update_monitors(active_monitors)
 
@@ -332,6 +335,9 @@ class SimServer(Generic[S]):
 
             # progress simulation
             self.sim.step(monitor_commands)
+
+            # record this simulation step
+            self.sim.rerun.step(self.sim.mj_data, self.sim.sim_time)
 
             # handle ready agents
             activated_agents = self._activate_agents(ready_agents)

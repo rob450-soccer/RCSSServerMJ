@@ -24,6 +24,7 @@ from rcsssmj.sim.sim_object import SimObject
 from rcsssmj.sim.simulation import BaseSimulation
 from rcsssmj.sim.state_info import SimStateInformation
 from rcsssmj.utils.mjutils import quat_from_axis_angle
+from rcsssmj.utils.rerun import RerunAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,8 @@ class SoccerSimulation(BaseSimulation):
         field: SoccerField,
         rules: SoccerRules | None = None,
         referee: SoccerReferee | None = None,
+        rerun_mode: str | None = None,
+        rerun_file: str | None = None
     ) -> None:
         """Construct a new simulation sever.
 
@@ -49,6 +52,12 @@ class SoccerSimulation(BaseSimulation):
 
         referee: SoccerReferee | None, default=None
             The soccer referee managing the game aspect of the simulation.
+        
+        rerun_mode: str | None, default=None
+            The mode for recording or streaming to Rerun.
+
+        rerun_file: str | None, default=None
+            The file to record to.
         """
 
         super().__init__(vision_interval=2)
@@ -61,6 +70,12 @@ class SoccerSimulation(BaseSimulation):
 
         self.referee: Final[SoccerReferee] = SoccerReferee() if referee is None else referee
         """The game referee responsible for managing the soccer game aspect of the simulation."""
+
+        self.rerun_mode: str = 'none' if rerun_mode is None else rerun_mode
+        """The mode determining if the simulation is recorded or streamed for Rerun."""
+
+        self.rerun_file: str = 'none' if rerun_file is None else rerun_file
+        """The file to record to."""
 
         self.game_state: Final[GameState] = GameState()
         """The current soccer game state."""
@@ -125,6 +140,9 @@ class SoccerSimulation(BaseSimulation):
 
         # initialize referee
         self.referee.reset()
+
+        # set up the Rerun streaming
+        self.rerun: RerunAdapter = RerunAdapter(self.rerun_mode, self, self.rerun_file)
 
         return True
 
@@ -412,6 +430,7 @@ class SoccerSimulation(BaseSimulation):
 
         # recompile spec in case new agents got added
         self._recompile()
+        self.rerun.recompile(self._mj_data, self._mj_model)
 
         return sim_agents
 
@@ -493,6 +512,7 @@ class SoccerSimulation(BaseSimulation):
                 self._remove_player(agent)
 
             self._recompile()
+            self.rerun.recompile(self._mj_data, self._mj_model)
 
     def _remove_player(self, player: SoccerAgent) -> None:
         """Remove the given player instance.
@@ -673,3 +693,9 @@ class SoccerSimulation(BaseSimulation):
             player.init_joints()
         else:
             logger.warning('Player %d of team %s does not exist!', player_id, team_name)
+
+    def shutdown(self) -> None:
+        """Shutdown Rerun and the simulation."""
+        if self.rerun is not None:
+            self.rerun.shutdown()
+        super().shutdown()

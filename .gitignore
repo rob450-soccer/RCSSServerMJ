@@ -21,6 +21,12 @@ MUJOCO_LOG.TXT
 
 # logfiles
 console.log
+*.log
+*.rrd
 
 # dev environment configs
 .idea/
+
+# misc
+.DS_Store
+._*

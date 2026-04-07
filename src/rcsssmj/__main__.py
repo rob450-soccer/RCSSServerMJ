@@ -36,6 +36,7 @@ def soccer_sim() -> None:
     # parse arguments
     parser = argparse.ArgumentParser(description='The RoboCup MuJoCo Soccer Simulation Server.')
 
+    rerun_options = ['none', 'record', 'stream', 'both']
     rule_books = [str(book.value) for book in SoccerRuleBooks if book != SoccerRuleBooks.UNKNOWN]
     field_versions = [str(version.value) for version in SoccerFieldVersions if version != SoccerFieldVersions.UNKNOWN]
 
@@ -48,6 +49,8 @@ def soccer_sim() -> None:
     parser.add_argument('-s', '--sync',       help='Run synchronous with agent clients.', default=False,       action='store_true')
     parser.add_argument('-r', '--realtime',   help='Run in real-time mode.',              default=True,        action=argparse.BooleanOptionalAction)
     parser.add_argument('-v', '--render',     help='Start internal monitor viewer.',      default=True,        action=argparse.BooleanOptionalAction)
+    parser.add_argument('-R', '--rerun',      help='Record or stream to Rerun.',          default='none',      type=str, choices=rerun_options)
+    parser.add_argument('-l', '--rerunfile', help='The Rerun file to record to.',         default=None,        type=str)
 
     # game arguments
     parser.add_argument('-f', '--field',      help='The soccer field version.',                                type=str, choices=field_versions)
@@ -62,7 +65,7 @@ def soccer_sim() -> None:
         args.field = rule_book.default_field_version.value
     soccer_field = create_soccer_field(args.field)
     referee = SoccerReferee()
-    sim = SoccerSimulation(soccer_field, rule_book, referee)
+    sim = SoccerSimulation(soccer_field, rule_book, referee, args.rerun, args.rerunfile)
 
     # create server
     server = SoccerSimServer(sim, args.host, args.aport, args.mport, sequential_mode=args.sequential, sync_mode=args.sync, real_time=args.realtime, render=args.render)

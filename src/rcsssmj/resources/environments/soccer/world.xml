@@ -7,7 +7,7 @@
     <texture name="pitch" file="pitch_nologo_l.png" type="2d"/>
     <material name="pitch" reflectance="0.0" texture="pitch" texrepeat="1 1" texuniform="false"/>
     <texture name="ball" type="cube" fileup="up.png" filedown="down.png" filefront="front.png" fileback="back.png" fileleft="left.png" fileright="right.png"/>
-    <material name="ball" texture="ball"/>
+    <material name="ball" texture="ball" rgba="0.7 0.7 0.7 1"/>
   </asset>
 
   <worldbody>

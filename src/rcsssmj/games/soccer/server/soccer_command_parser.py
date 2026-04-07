@@ -53,6 +53,9 @@ class SoccerCommandParser(DefaultCommandParser):
             elif node[1] == b'Right' or node[1] == b'right' or node[1] == b'R' or node[1] == b'r':
                 team_id = 1
 
+        team_name = 'Left' if team_id == 0 else 'Right'
+        logger.info(f"Kick-off for {team_name} team")
+
         return KickOffCommand(team_id)
 
     def _parse_play_mode_command(self, node: SExpression) -> MonitorCommand | None:
