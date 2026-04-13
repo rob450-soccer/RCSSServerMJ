@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import cast
 
 from rcsssmj.games.soccer.play_mode import PlayMode
@@ -56,7 +57,8 @@ class SoccerReferee:
         self.game.game_state.agent_na_touch_ball = None
         self.game.game_state.team_na_score = team_side
 
-        self.game.ball.drop_at(0, 0)
+        if os.environ.get("RESET_BALL_ON_KICKOFF", "1") != "0":
+            self.game.ball.drop_at(0, 0)
 
     def play_on(self) -> None:
         """Instruct the normal progressing of the game."""
