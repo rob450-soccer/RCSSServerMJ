@@ -53,6 +53,34 @@ class TimePerception(Perception):
         return f'(time ({self.name} {self.time}))'
 
 
+class BallGroundTruthVelocityPerception(Perception):
+    """Simulator ground-truth ball linear velocity (m/s), for tests and tooling.
+
+    Not sensor noise; appended by the soccer simulation from MuJoCo state.
+    S-expression: ``(ballGT (vel vx vy vz))``
+    """
+
+    def __init__(self, vx: float, vy: float, vz: float) -> None:
+        super().__init__('ballGT')
+        self.vx: Final[float] = vx
+        self.vy: Final[float] = vy
+        self.vz: Final[float] = vz
+
+    def to_sexp(self) -> str:
+        return f'(ballGT (vel {self.vx} {self.vy} {self.vz}))'
+
+
+class LegActuatorTorquePeakGroundTruthPerception(Perception):
+    """Peak leg torque (Nm) from MuJoCo: max of leg motor ``actuator_force`` and leg ``|qfrc_actuator|``."""
+
+    def __init__(self, peak_nm: float) -> None:
+        super().__init__('tauGT')
+        self.peak_nm: Final[float] = peak_nm
+
+    def to_sexp(self) -> str:
+        return f'(tauGT (peak {self.peak_nm}))'
+
+
 class PositionPerception(Perception):
     """Position perception."""
 

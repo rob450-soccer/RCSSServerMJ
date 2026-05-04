@@ -262,12 +262,6 @@ class SimServer(Generic[S]):
             # handle disconnected agents
             self._deactivate_agents(disconnected_agents)
 
-            # handle ready agents
-            activated_agents = self._activate_agents(ready_agents)
-
-            # generate perceptions
-            self.sim.generate_perceptions()
-
             # sleep to match simulation interval
             if self.real_time:
                 time.sleep(max(0, sim_timestep - (time.time() - cycle_start) - 0.0001))
@@ -276,9 +270,6 @@ class SimServer(Generic[S]):
             # collect agent actions
             # Note: Actions need to be collected before sending perceptions to agents in parallel mode to prevent fetching new actions that arrived while still sending perceptions.
             self._collect_actions(active_agents, block=self.sync_mode)
-
-            # send perceptions
-            self._send_perceptions(*active_agents, *activated_agents)
 
             # collect monitor commands
             monitor_commands = self._collect_commands(active_monitors)
@@ -289,6 +280,15 @@ class SimServer(Generic[S]):
 
             # record this simulation step
             self.sim.rerun.step(self.sim.mj_data, self.sim.sim_time)
+
+            # handle ready agents (same ordering as sequential loop)
+            activated_agents = self._activate_agents(ready_agents)
+
+            # perceptions after physics step so actuator / joint torques match the stepped state
+            self.sim.generate_perceptions()
+
+            # send perceptions
+            self._send_perceptions(*active_agents, *activated_agents)
 
             # update connected monitors
             self._update_monitors(active_monitors)

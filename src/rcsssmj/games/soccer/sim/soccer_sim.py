@@ -6,6 +6,7 @@ from math import degrees, pi
 from typing import Any, Final
 
 import mujoco
+import numpy as np
 
 from rcsssmj.games.soccer.sim.soccer_agent import SoccerAgent
 from rcsssmj.games.soccer.sim.soccer_ball import SoccerBall
@@ -19,7 +20,7 @@ from rcsssmj.games.teams import TeamSide
 from rcsssmj.sim.agent_id import AgentID
 from rcsssmj.sim.agent_params import PAgentParameter
 from rcsssmj.sim.commands import MonitorCommand
-from rcsssmj.sim.perceptions import Perception
+from rcsssmj.sim.perceptions import BallGroundTruthVelocityPerception, LegActuatorTorquePeakGroundTruthPerception, Perception
 from rcsssmj.sim.sim_object import SimObject
 from rcsssmj.sim.simulation import BaseSimulation
 from rcsssmj.sim.state_info import SimStateInformation
@@ -27,6 +28,69 @@ from rcsssmj.utils.mjutils import quat_from_axis_angle
 from rcsssmj.utils.rerun import RerunAdapter
 
 logger = logging.getLogger(__name__)
+
+
+def _joint_dof_count(mj_model: Any, j: int) -> int:
+    """DoF count for joint ``j`` (some MuJoCo Python builds omit ``jnt_dofnum``)."""
+    jdn = getattr(mj_model, "jnt_dofnum", None)
+    if jdn is not None:
+        return int(jdn[j])
+    adr = int(mj_model.jnt_dofadr[j])
+    if adr < 0:
+        return 0
+    if j + 1 < mj_model.njnt:
+        nxt = int(mj_model.jnt_dofadr[j + 1])
+        if nxt < 0:
+            return int(mj_model.nv) - adr
+        return nxt - adr
+    return int(mj_model.nv) - adr
+
+
+def _max_leg_motor_actuator_torque_nm(mj_model: Any, mj_data: Any, agent_prefix: str) -> float:
+    """Peak leg torque (Nm) for telemetry: max of motor ``actuator_force`` and leg joint ``|qfrc_actuator|``.
+
+    Motor rows alone can read as zero depending on timing/actuator type; joint-space ``qfrc_actuator``
+    matches applied actuator torque on each leg DoF (hinge = Nm).
+    """
+    peak = 0.0
+
+    nu = mj_model.nu
+    for i in range(nu):
+        name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+        if name is None or not name.startswith(agent_prefix):
+            continue
+        short = name[len(agent_prefix) :]
+        if not (short.startswith('lle') or short.startswith('rle')) or not short.endswith('_tau'):
+            continue
+        af = float(mj_data.actuator_force[i])
+        if np.isfinite(af):
+            peak = max(peak, abs(af))
+
+    leg_markers = (
+        'Left_Hip',
+        'Left_Knee',
+        'Left_Ankle',
+        'Right_Hip',
+        'Right_Knee',
+        'Right_Ankle',
+    )
+    for j in range(mj_model.njnt):
+        jname = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_JOINT, j)
+        if jname is None or not jname.startswith(agent_prefix):
+            continue
+        jshort = jname[len(agent_prefix) :]
+        if not any(m in jshort for m in leg_markers):
+            continue
+        dof_adr = int(mj_model.jnt_dofadr[j])
+        if dof_adr < 0:
+            continue
+        ndof = _joint_dof_count(mj_model, j)
+        for k in range(ndof):
+            qv = float(mj_data.qfrc_actuator[dof_adr + k])
+            if np.isfinite(qv):
+                peak = max(peak, abs(qv))
+
+    return float(np.trunc(peak * 1000.0) / 1000.0)
 
 
 class SoccerSimulation(BaseSimulation):
@@ -539,6 +603,20 @@ class SoccerSimulation(BaseSimulation):
 
         # referee game
         self.referee.referee()
+
+    def generate_perceptions(self, *, gen_vision: bool | None = None) -> None:
+        """Generate perceptions and append simulator ground-truth ball linear velocity."""
+
+        super().generate_perceptions(gen_vision=gen_vision)
+
+        # Free joint: first three qvel components are linear velocity (m/s) in world frame.
+        lin = self.ball._qvel[0:3].astype(np.float64, copy=False)
+        vel = np.trunc(lin * 1000.0) / 1000.0
+        bgt = BallGroundTruthVelocityPerception(float(vel[0]), float(vel[1]), float(vel[2]))
+        for agent in self.sim_agents:
+            peak_nm = _max_leg_motor_actuator_torque_nm(self._mj_model, self._mj_data, agent.agent_id.prefix)
+            tau_gt = LegActuatorTorquePeakGroundTruthPerception(peak_nm)
+            agent.set_perceptions([*agent.perceptions, bgt, tau_gt])
 
     def _generate_game_state_perception(self) -> Perception:
         return GameStatePerception(
